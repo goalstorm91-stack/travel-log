@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { db } from "../db";
 import { getCountryLabel } from "../data/countries";
+import { colorForCountry } from "../utils/colors";
 import WorldMap from "../components/WorldMap";
 import type { Trip } from "../types";
 
@@ -60,7 +61,11 @@ export default function MapPage() {
                 key={code}
                 className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5"
               >
-                <span className="text-sm font-medium text-gray-800">
+                <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: colorForCountry(code) }}
+                  />
                   {getCountryLabel(ts![0].countryName)}
                 </span>
                 <div className="flex gap-1">

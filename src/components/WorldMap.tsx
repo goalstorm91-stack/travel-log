@@ -3,6 +3,7 @@ import { geoPath, geoNaturalEarth1 } from "d3-geo";
 import { feature } from "topojson-client";
 import type { FeatureCollection, Geometry } from "geojson";
 import worldData from "../data/countries-110m.json";
+import { colorForCountry } from "../utils/colors";
 
 const WIDTH = 480;
 const HEIGHT = 260;
@@ -57,7 +58,7 @@ export default function WorldMap({
           <path
             key={c.id ?? c.properties.name}
             d={path(c as never) ?? undefined}
-            fill={visited ? "#6366f1" : "#e5e7eb"}
+            fill={visited ? colorForCountry(c.id) : "#e5e7eb"}
             stroke="#fff"
             strokeWidth={0.5}
             opacity={isActive ? 0.8 : 1}
