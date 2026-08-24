@@ -51,7 +51,7 @@ export default function MapPage() {
   function focusOnCountry(code: string, ts: Trip[]) {
     const withCoords = ts.filter((t) => t.cityLat != null && t.cityLng != null);
     if (withCoords.length === 1) {
-      mapRef.current?.focusPoint(withCoords[0].cityLat!, withCoords[0].cityLng!, 6);
+      mapRef.current?.focusPoint(withCoords[0].cityLat!, withCoords[0].cityLng!, 12);
       setActivePinId(withCoords[0].id);
     } else {
       mapRef.current?.focusCountry(code);
@@ -60,10 +60,18 @@ export default function MapPage() {
     setFocused(true);
   }
 
+  function handleCountryClick(code: string) {
+    setFocused(true);
+    const withCoords = (tripsByCountry[code] ?? []).filter(
+      (t) => t.cityLat != null && t.cityLng != null,
+    );
+    setActivePinId(withCoords.length === 1 ? withCoords[0].id : null);
+  }
+
   function handlePinClick(tripId: string) {
     const trip = (trips ?? []).find((t) => t.id === tripId);
     if (!trip || trip.cityLat == null || trip.cityLng == null) return;
-    mapRef.current?.focusPoint(trip.cityLat, trip.cityLng, 7);
+    mapRef.current?.focusPoint(trip.cityLat, trip.cityLng, 13);
     setActivePinId(tripId);
     setFocused(true);
   }
@@ -81,13 +89,14 @@ export default function MapPage() {
         {countryCount}개국 {cityCount}개 도시 여행
       </p>
 
-      <div className="relative overflow-hidden rounded-2xl bg-gray-50 p-1">
+      <div className="relative overflow-hidden rounded-3xl shadow-sm ring-1 ring-black/5">
         <WorldMap
           ref={mapRef}
           visitedCodes={visitedCodes}
           pins={pins}
           activePinId={activePinId}
           onHoverCountry={(_, name) => setHoveredName(name)}
+          onCountryClick={(code) => handleCountryClick(code)}
           onPinClick={handlePinClick}
         />
         {focused && (

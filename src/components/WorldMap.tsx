@@ -1,13 +1,11 @@
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
-import { geoPath, geoNaturalEarth1 } from "d3-geo";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { geoBounds } from "d3-geo";
 import { feature } from "topojson-client";
 import type { FeatureCollection, Geometry } from "geojson";
 import worldData from "../data/countries-110m.json";
 import { colorForCountry } from "../utils/colors";
-
-const WIDTH = 480;
-const HEIGHT = 260;
-const MAX_SCALE = 12;
 
 interface CountryFeature {
   type: "Feature";
@@ -26,14 +24,25 @@ export interface MapPin {
 
 export interface WorldMapHandle {
   focusCountry: (countryCode: string) => void;
-  focusPoint: (lat: number, lng: number, scale?: number) => void;
+  focusPoint: (lat: number, lng: number, zoom?: number) => void;
   reset: () => void;
 }
 
-interface Focus {
-  cx: number;
-  cy: number;
-  scale: number;
+const WORLD_CENTER: [number, number] = [20, 10];
+const WORLD_ZOOM = 2;
+
+function pinDivIcon(color: string, active: boolean): L.DivIcon {
+  const size = active ? 34 : 26;
+  return L.divIcon({
+    className: "",
+    html: `
+      <svg width="${size}" height="${size}" viewBox="-8 -12 16 22" style="filter: drop-shadow(0 1.5px 2px rgba(15,23,42,0.4))">
+        <path d="M0 10 C0 10 6.5 5 6.5 0 C6.5 -3.6 3.6 -6.5 0 -6.5 C-3.6 -6.5 -6.5 -3.6 -6.5 0 C-6.5 5 0 10 0 10 Z" fill="${color}" stroke="#fff" stroke-width="1.4"/>
+        <circle cx="0" cy="0" r="2.3" fill="#fff"/>
+      </svg>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+  });
 }
 
 const WorldMap = forwardRef<
@@ -43,14 +52,17 @@ const WorldMap = forwardRef<
     pins?: MapPin[];
     activePinId?: string | null;
     onHoverCountry?: (id: string | null, name: string | null) => void;
+    onCountryClick?: (id: string, name: string) => void;
     onPinClick?: (tripId: string) => void;
   }
 >(function WorldMap(
-  { visitedCodes, pins = [], activePinId, onHoverCountry, onPinClick },
+  { visitedCodes, pins = [], activePinId, onHoverCountry, onCountryClick, onPinClick },
   ref,
 ) {
-  const [activeCountry, setActiveCountry] = useState<string | null>(null);
-  const [focus, setFocus] = useState<Focus | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const countryLayerRef = useRef<L.GeoJSON | null>(null);
+  const markersRef = useRef<Map<string, L.Marker>>(new Map());
 
   const countries = useMemo(() => {
     const collection = feature(
@@ -61,115 +73,119 @@ const WorldMap = forwardRef<
     return collection.features as unknown as CountryFeature[];
   }, []);
 
-  const projection = useMemo(
-    () =>
-      geoNaturalEarth1().fitSize([WIDTH, HEIGHT], {
-        type: "FeatureCollection",
-        features: countries,
-      } as never),
-    [countries],
-  );
-  const path = useMemo(() => geoPath(projection), [projection]);
+  // Init map once.
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    const map = L.map(containerRef.current, {
+      center: WORLD_CENTER,
+      zoom: WORLD_ZOOM,
+      minZoom: 2,
+      maxZoom: 16,
+      worldCopyJump: true,
+      attributionControl: true,
+    });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      // React 18 StrictMode runs this effect twice in dev; Leaflet leaves an
+      // internal marker on the container after remove() that breaks the next
+      // init (animations silently no-op) unless it's cleared here.
+      if (containerRef.current) {
+        delete (containerRef.current as unknown as { _leaflet_id?: number })._leaflet_id;
+      }
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Country tint overlay, redrawn when visited set changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    countryLayerRef.current?.remove();
+    const layer = L.geoJSON(
+      { type: "FeatureCollection", features: countries } as never,
+      {
+        style: (feat) => {
+          const id = (feat as unknown as CountryFeature).id;
+          const visited = visitedCodes.has(id);
+          return {
+            fillColor: visited ? colorForCountry(id) : "#000000",
+            fillOpacity: visited ? 0.4 : 0,
+            color: visited ? "#ffffff" : "transparent",
+            weight: visited ? 1 : 0,
+          };
+        },
+        onEachFeature: (feat, geoLayer) => {
+          const cf = feat as unknown as CountryFeature;
+          geoLayer.on({
+            mouseover: () => onHoverCountry?.(cf.id, cf.properties.name),
+            mouseout: () => onHoverCountry?.(null, null),
+            click: () => {
+              zoomToCountry(cf.id);
+              onCountryClick?.(cf.id, cf.properties.name);
+            },
+          });
+        },
+      },
+    );
+    layer.addTo(map);
+    countryLayerRef.current = layer;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countries, visitedCodes]);
+
+  // Pin markers, redrawn when pins/activePinId change.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    for (const marker of markersRef.current.values()) marker.remove();
+    markersRef.current.clear();
+
+    for (const pin of pins) {
+      const marker = L.marker([pin.lat, pin.lng], {
+        icon: pinDivIcon(pin.color, pin.tripId === activePinId),
+      });
+      marker.on("click", () => onPinClick?.(pin.tripId));
+      marker.addTo(map);
+      markersRef.current.set(pin.tripId, marker);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pins, activePinId]);
+
+  function zoomToCountry(countryCode: string) {
+    const map = mapRef.current;
+    const feat = countries.find((c) => c.id === countryCode);
+    if (!map || !feat) return;
+    const [[minLng, minLat], [maxLng, maxLat]] = geoBounds(feat as never);
+    map.flyToBounds(
+      [
+        [minLat, minLng],
+        [maxLat, maxLng],
+      ],
+      { duration: 0.8, maxZoom: 8, padding: [20, 20] },
+    );
+  }
 
   useImperativeHandle(
     ref,
     () => ({
-      focusCountry(countryCode) {
-        const feat = countries.find((c) => c.id === countryCode);
-        if (!feat) return;
-        const [[x0, y0], [x1, y1]] = path.bounds(feat as never);
-        const cx = (x0 + x1) / 2;
-        const cy = (y0 + y1) / 2;
-        const w = Math.max(x1 - x0, 1);
-        const h = Math.max(y1 - y0, 1);
-        const scale = Math.min(
-          MAX_SCALE,
-          Math.max(1.4, Math.min(WIDTH / w, HEIGHT / h) * 0.6),
-        );
-        setFocus({ cx, cy, scale });
-      },
-      focusPoint(lat, lng, scale = 6) {
-        const projected = projection([lng, lat]);
-        if (!projected) return;
-        setFocus({ cx: projected[0], cy: projected[1], scale });
+      focusCountry: zoomToCountry,
+      focusPoint(lat, lng, zoom = 12) {
+        mapRef.current?.flyTo([lat, lng], zoom, { duration: 0.8 });
       },
       reset() {
-        setFocus(null);
+        mapRef.current?.flyTo(WORLD_CENTER, WORLD_ZOOM, { duration: 0.8 });
       },
     }),
-    [countries, path, projection],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [countries],
   );
 
-  const scale = focus?.scale ?? 1;
-  const transform = focus
-    ? `translate(${WIDTH / 2 - focus.cx * focus.scale} ${HEIGHT / 2 - focus.cy * focus.scale}) scale(${focus.scale})`
-    : "translate(0 0) scale(1)";
-
-  return (
-    <svg
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      className="w-full"
-      onMouseLeave={() => {
-        setActiveCountry(null);
-        onHoverCountry?.(null, null);
-      }}
-    >
-      <g style={{ transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)" }} transform={transform}>
-        {countries.map((c) => {
-          const visited = visitedCodes.has(c.id);
-          const isActive = activeCountry === c.id;
-          return (
-            <path
-              key={c.id ?? c.properties.name}
-              d={path(c as never) ?? undefined}
-              fill={visited ? colorForCountry(c.id) : "#e5e7eb"}
-              stroke="#fff"
-              strokeWidth={0.5 / scale}
-              opacity={isActive ? 0.8 : 1}
-              onMouseEnter={() => {
-                setActiveCountry(c.id);
-                onHoverCountry?.(c.id, c.properties.name);
-              }}
-            />
-          );
-        })}
-        {pins.map((pin) => {
-          const projected = projection([pin.lng, pin.lat]);
-          if (!projected) return null;
-          const [x, y] = projected;
-          const isActive = activePinId === pin.tripId;
-          return (
-            <g
-              key={pin.tripId}
-              transform={`translate(${x} ${y}) scale(${1 / scale})`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onPinClick?.(pin.tripId);
-              }}
-              className="cursor-pointer"
-            >
-              <PinIcon color={pin.color} active={isActive} />
-            </g>
-          );
-        })}
-      </g>
-    </svg>
-  );
+  return <div ref={containerRef} className="h-72 w-full" />;
 });
 
 export default WorldMap;
-
-function PinIcon({ color, active }: { color: string; active: boolean }) {
-  const scale = active ? 1.3 : 1;
-  return (
-    <g transform={`translate(0 -9) scale(${scale})`}>
-      <path
-        d="M0 9 C0 9 6 4.5 6 0 C6 -3.3 3.3 -6 0 -6 C-3.3 -6 -6 -3.3 -6 0 C-6 4.5 0 9 0 9 Z"
-        fill={color}
-        stroke="#fff"
-        strokeWidth={1}
-      />
-      <circle cx={0} cy={0} r={2} fill="#fff" />
-    </g>
-  );
-}

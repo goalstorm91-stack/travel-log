@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import Home from "./pages/Home";
@@ -5,8 +6,9 @@ import NewTrip from "./pages/NewTrip";
 import TripDetail from "./pages/TripDetail";
 import DayEditor from "./pages/DayEditor";
 import Expenses from "./pages/Expenses";
-import MapPage from "./pages/MapPage";
 import Settings from "./pages/Settings";
+
+const MapPage = lazy(() => import("./pages/MapPage"));
 
 export default function App() {
   return (
@@ -14,7 +16,14 @@ export default function App() {
       <div className="no-scrollbar flex-1 overflow-y-auto pb-2">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/map" element={<MapPage />} />
+          <Route
+            path="/map"
+            element={
+              <Suspense fallback={<div className="px-4 pt-6 text-sm text-gray-400">지도를 불러오는 중...</div>}>
+                <MapPage />
+              </Suspense>
+            }
+          />
           <Route path="/trips/new" element={<NewTrip />} />
           <Route path="/trips/:tripId" element={<TripDetail />} />
           <Route path="/trips/:tripId/days/new" element={<DayEditor />} />
