@@ -2,6 +2,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { db } from "../db";
 import { getCountryLabel } from "../data/countries";
+import { toISODate } from "../utils/exif";
+import type { Trip } from "../types";
 import PhotoImg from "../components/PhotoImg";
 
 export default function Home() {
@@ -21,7 +23,7 @@ export default function Home() {
 
   return (
     <div className="px-4 pt-6 pb-4">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-5 flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold tracking-widest text-indigo-500">
             TRAVEL JOURNAL
@@ -45,27 +47,13 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mb-6 flex gap-3">
+      {trips && <HeroCard trips={trips} />}
+
+      <div className="mb-6 mt-5 flex gap-3">
         <StatCard label="방문 국가" value={stats?.countryCount ?? 0} />
         <StatCard label="방문 도시" value={stats?.cityCount ?? 0} />
         <StatCard label="여행 기록" value={trips?.length ?? 0} />
       </div>
-
-      {trips && trips.length === 0 && (
-        <div className="mt-16 flex flex-col items-center gap-3 text-center">
-          <div className="text-4xl">✈️</div>
-          <p className="text-sm text-gray-500">
-            아직 기록된 여행이 없어요.
-            <br />첫 여행을 남겨보세요.
-          </p>
-          <Link
-            to="/trips/new"
-            className="mt-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white"
-          >
-            + 새 여행 만들기
-          </Link>
-        </div>
-      )}
 
       {Object.entries(grouped)
         .sort((a, b) => Number(b[0]) - Number(a[0]))
@@ -102,7 +90,109 @@ export default function Home() {
             </div>
           </div>
         ))}
+
+      <p className="mt-10 pb-2 text-center text-[11px] text-gray-300">
+        Made by Seo Taeseong, 2026
+      </p>
     </div>
+  );
+}
+
+function HeroCard({ trips }: { trips: Trip[] }) {
+  const today = toISODate(new Date());
+  const activeTrip = trips.find((t) => t.startDate <= today && today <= t.endDate);
+
+  if (activeTrip) {
+    const dayNum =
+      Math.floor(
+        (new Date(today).getTime() - new Date(activeTrip.startDate).getTime()) /
+          86_400_000,
+      ) + 1;
+    return (
+      <HeroShell
+        to={`/trips/${activeTrip.id}/days/new`}
+        eyebrow="여행 중"
+        title={`${activeTrip.title}, 잘 즐기고 계신가요?`}
+        subtitle={`${dayNum}일째 · ${getCountryLabel(activeTrip.countryName)} ${activeTrip.city}`}
+        cta="+ 오늘 기록하기"
+        photoId={activeTrip.coverPhotoId}
+        emoji={activeTrip.emoji}
+      />
+    );
+  }
+
+  if (trips.length > 0) {
+    return (
+      <HeroShell
+        to="/trips/new"
+        eyebrow="다음 이야기"
+        title="또 어디로 떠나볼까요?"
+        subtitle={`지금까지 ${trips.length}번의 여행을 기록했어요`}
+        cta="+ 새 여행 만들기"
+        photoId={trips[0].coverPhotoId}
+        emoji={trips[0].emoji}
+      />
+    );
+  }
+
+  return (
+    <HeroShell
+      to="/trips/new"
+      eyebrow="TRAVEL JOURNAL"
+      title="여행은 끝나도, 기억은 남아요"
+      subtitle="사진과 글, 그날의 지출까지. 흩어지는 순간을 하나씩 모아보세요."
+      cta="+ 첫 여행 시작하기"
+      emoji="🧳"
+    />
+  );
+}
+
+function HeroShell({
+  to,
+  eyebrow,
+  title,
+  subtitle,
+  cta,
+  photoId,
+  emoji,
+}: {
+  to: string;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  cta: string;
+  photoId?: string;
+  emoji?: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-200"
+    >
+      <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+      <div className="pointer-events-none absolute -bottom-10 left-10 h-28 w-28 rounded-full bg-white/10 blur-2xl" />
+
+      <div className="relative flex-1">
+        <p className="mb-1.5 text-[11px] font-semibold tracking-wider text-indigo-100">
+          {eyebrow}
+        </p>
+        <h2 className="text-lg font-bold leading-snug">{title}</h2>
+        <p className="mt-1 text-xs text-indigo-100">{subtitle}</p>
+        <span className="mt-3 inline-block rounded-full bg-white px-4 py-2 text-xs font-bold text-indigo-600">
+          {cta}
+        </span>
+      </div>
+
+      <div className="relative shrink-0 rotate-3 rounded-md bg-white p-1.5 shadow-xl">
+        {photoId ? (
+          <PhotoImg photoId={photoId} className="h-20 w-16 rounded-sm" />
+        ) : (
+          <div className="flex h-20 w-16 items-center justify-center rounded-sm bg-indigo-50 text-3xl">
+            {emoji ?? "✈️"}
+          </div>
+        )}
+      </div>
+    </Link>
   );
 }
 
