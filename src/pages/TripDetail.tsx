@@ -8,6 +8,7 @@ import { getCountryLabel } from "../data/countries";
 import { formatDateKR } from "../utils/format";
 import { getCaptureMoment, toISODate } from "../utils/exif";
 import { renumberDays } from "../utils/days";
+import { generateTripShareCard, shareTripCard } from "../utils/shareCard";
 import PhotoImg from "../components/PhotoImg";
 import PhotoCollage from "../components/PhotoCollage";
 
@@ -17,6 +18,8 @@ export default function TripDetail() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const autoOrganizeInputRef = useRef<HTMLInputElement>(null);
   const [organizing, setOrganizing] = useState<{ done: number; total: number } | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
 
   const trip = useLiveQuery(() => db.trips.get(tripId!), [tripId]);
   const days = useLiveQuery(
@@ -99,6 +102,25 @@ export default function TripDetail() {
     e.target.value = "";
   }
 
+  async function handleShare() {
+    setSharing(true);
+    setShareMessage("");
+    try {
+      const dayCount = days?.length ?? 0;
+      const photoCount = (days ?? []).reduce((sum, d) => sum + d.photoIds.length, 0);
+      const coverBlob = trip!.coverPhotoId
+        ? (await db.photos.get(trip!.coverPhotoId))?.blob
+        : undefined;
+      const cardBlob = await generateTripShareCard(trip!, { dayCount, photoCount }, coverBlob);
+      const result = await shareTripCard(trip!, cardBlob);
+      setShareMessage(result === "shared" ? "공유했어요!" : "이미지를 저장했어요.");
+    } catch {
+      setShareMessage("공유 카드를 만들지 못했어요.");
+    } finally {
+      setSharing(false);
+    }
+  }
+
   async function handleDeleteTrip() {
     if (!confirm(`"${trip!.title}" 여행을 삭제할까요? 모든 기록과 사진이 사라집니다.`)) return;
     const dayIds = (await db.days.where("tripId").equals(trip!.id).primaryKeys()) as string[];
@@ -144,16 +166,34 @@ export default function TripDetail() {
         >
           ‹
         </Link>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDeleteTrip();
-          }}
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white"
-        >
-          🗑
-        </button>
+        <div className="absolute right-3 top-3 flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShare();
+            }}
+            disabled={sharing}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white disabled:opacity-50"
+          >
+            {sharing ? "…" : "🔗"}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteTrip();
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white"
+          >
+            🗑
+          </button>
+        </div>
       </div>
+
+      {shareMessage && (
+        <p className="bg-indigo-50 px-4 py-2 text-center text-xs font-medium text-indigo-600">
+          {shareMessage}
+        </p>
+      )}
 
       <div className="flex border-b border-gray-100 px-4">
         <div className="flex-1 border-b-2 border-indigo-600 py-3 text-center text-sm font-semibold text-indigo-600">

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { v4 as uuid } from "uuid";
 import { db } from "../db";
 import { COUNTRIES } from "../data/countries";
+import { findCityCoords } from "../utils/geocode";
 import type { Trip } from "../types";
 
 const EMOJIS = ["🧳", "✈️", "🏖️", "🗺️", "🌸", "🎡", "⛰️", "🏛️"];
@@ -37,6 +38,7 @@ export default function NewTrip() {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+    const cityCoords = await findCityCoords(city.trim(), matchedCountry.name);
     const trip: Trip = {
       id: uuid(),
       title: title.trim(),
@@ -44,6 +46,8 @@ export default function NewTrip() {
       countryName: matchedCountry.name,
       countryCode: matchedCountry.id,
       city: city.trim(),
+      cityLat: cityCoords?.lat,
+      cityLng: cityCoords?.lng,
       startDate,
       endDate,
       companions: ["나", ...companions],

@@ -1,18 +1,37 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { db } from "../db";
 import { getCountryLabel } from "../data/countries";
 import { colorForCountry } from "../utils/colors";
-import WorldMap from "../components/WorldMap";
+import WorldMap, { type MapPin, type WorldMapHandle } from "../components/WorldMap";
 import type { Trip } from "../types";
 
 export default function MapPage() {
   const trips = useLiveQuery(() => db.trips.toArray(), []);
   const [hoveredName, setHoveredName] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  const [activePinId, setActivePinId] = useState<string | null>(null);
+  const mapRef = useRef<WorldMapHandle>(null);
 
   const visitedCodes = useMemo(
     () => new Set((trips ?? []).map((t) => t.countryCode)),
+    [trips],
+  );
+
+  const pins: MapPin[] = useMemo(
+    () =>
+      (trips ?? [])
+        .filter((t): t is Trip & { cityLat: number; cityLng: number } =>
+          t.cityLat != null && t.cityLng != null,
+        )
+        .map((t) => ({
+          tripId: t.id,
+          lat: t.cityLat,
+          lng: t.cityLng,
+          color: colorForCountry(t.countryCode),
+          label: `${t.city} · ${t.title}`,
+        })),
     [trips],
   );
 
@@ -24,8 +43,36 @@ export default function MapPage() {
     return out;
   }, [trips]);
 
+  const activeTrip = (trips ?? []).find((t) => t.id === activePinId);
+
   const countryCount = visitedCodes.size;
   const cityCount = new Set((trips ?? []).map((t) => `${t.countryCode}-${t.city}`)).size;
+
+  function focusOnCountry(code: string, ts: Trip[]) {
+    const withCoords = ts.filter((t) => t.cityLat != null && t.cityLng != null);
+    if (withCoords.length === 1) {
+      mapRef.current?.focusPoint(withCoords[0].cityLat!, withCoords[0].cityLng!, 6);
+      setActivePinId(withCoords[0].id);
+    } else {
+      mapRef.current?.focusCountry(code);
+      setActivePinId(null);
+    }
+    setFocused(true);
+  }
+
+  function handlePinClick(tripId: string) {
+    const trip = (trips ?? []).find((t) => t.id === tripId);
+    if (!trip || trip.cityLat == null || trip.cityLng == null) return;
+    mapRef.current?.focusPoint(trip.cityLat, trip.cityLng, 7);
+    setActivePinId(tripId);
+    setFocused(true);
+  }
+
+  function resetView() {
+    mapRef.current?.reset();
+    setFocused(false);
+    setActivePinId(null);
+  }
 
   return (
     <div className="px-4 pt-6 pb-4">
@@ -34,15 +81,37 @@ export default function MapPage() {
         {countryCount}개국 {cityCount}개 도시 여행
       </p>
 
-      <div className="overflow-hidden rounded-2xl bg-gray-50 p-1">
+      <div className="relative overflow-hidden rounded-2xl bg-gray-50 p-1">
         <WorldMap
+          ref={mapRef}
           visitedCodes={visitedCodes}
-          onHover={(_, name) => setHoveredName(name)}
+          pins={pins}
+          activePinId={activePinId}
+          onHoverCountry={(_, name) => setHoveredName(name)}
+          onPinClick={handlePinClick}
         />
+        {focused && (
+          <button
+            onClick={resetView}
+            className="absolute right-2 top-2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-gray-600 shadow"
+          >
+            전체 지도
+          </button>
+        )}
       </div>
-      <p className="mt-2 h-4 text-center text-xs text-gray-500">
-        {hoveredName ? getCountryLabel(hoveredName) : ""}
-      </p>
+
+      <div className="mt-2 flex h-8 items-center justify-center text-center text-xs text-gray-500">
+        {activeTrip ? (
+          <Link
+            to={`/trips/${activeTrip.id}`}
+            className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600"
+          >
+            📍 {getCountryLabel(activeTrip.countryName)} {activeTrip.city} · {activeTrip.title} 보기
+          </Link>
+        ) : (
+          hoveredName && getCountryLabel(hoveredName)
+        )}
+      </div>
 
       <div className="mt-4">
         <h2 className="mb-2 text-sm font-bold text-gray-700">
@@ -61,13 +130,16 @@ export default function MapPage() {
                 key={code}
                 className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5"
               >
-                <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                <button
+                  onClick={() => focusOnCountry(code, ts!)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-800"
+                >
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ background: colorForCountry(code) }}
                   />
                   {getCountryLabel(ts![0].countryName)}
-                </span>
+                </button>
                 <div className="flex gap-1">
                   {ts!.map((t) => (
                     <Link

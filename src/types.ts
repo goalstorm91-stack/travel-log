@@ -5,6 +5,8 @@ export interface Trip {
   countryName: string;
   countryCode: string; // ISO 3166-1 numeric id, matches topojson `id`
   city: string;
+  cityLat?: number; // resolved from the bundled city dataset, when matched
+  cityLng?: number;
   startDate: string; // ISO date yyyy-MM-dd
   endDate: string; // ISO date yyyy-MM-dd
   companions: string[]; // people involved for settlement, "나" always included
