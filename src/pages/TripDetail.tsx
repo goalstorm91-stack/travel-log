@@ -141,36 +141,39 @@ export default function TripDetail() {
             {formatDateKR(trip.startDate)} - {formatDateKR(trip.endDate)}
           </p>
         </div>
+      </div>
+
+      {/* Actions live below the photo, where they're readable on any cover and can't be
+          confused with the cover itself. Changing the cover is its own explicit button. */}
+      <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
         <Link
           to="/"
           aria-label="홈으로"
-          className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white"
+          className="flex h-10 items-center gap-1 rounded-full bg-gray-100 px-4 text-sm font-semibold text-gray-700"
         >
-          ‹
+          <span className="text-base leading-none">‹</span> 홈
         </Link>
-        {/* Changing the cover is an explicit action: making the whole header a file-picker
-            trigger fired it for every tap that reached it (including the back link). */}
-        <button
-          onClick={() => coverInputRef.current?.click()}
-          className="absolute bottom-3 right-3 rounded-full bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white"
-        >
-          📷 표지 변경
-        </button>
-        <div className="absolute right-3 top-3 flex gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => coverInputRef.current?.click()}
+            className="flex h-10 items-center rounded-full bg-gray-100 px-3.5 text-[13px] font-semibold text-gray-700"
+          >
+            📷 표지
+          </button>
           <button
             onClick={handleShare}
             aria-label="공유"
             disabled={sharing}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white disabled:opacity-50"
+            className="flex h-10 items-center rounded-full bg-indigo-50 px-3.5 text-[13px] font-semibold text-indigo-600 disabled:opacity-50"
           >
-            {sharing ? "…" : "🔗"}
+            {sharing ? "만드는 중…" : "🔗 공유"}
           </button>
           <button
             onClick={handleDeleteTrip}
             aria-label="여행 삭제"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white"
+            className="flex h-10 items-center rounded-full bg-red-50 px-3.5 text-[13px] font-semibold text-red-500"
           >
-            🗑
+            🗑 삭제
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
+import UpdateBanner from "./components/UpdateBanner";
 import Home from "./pages/Home";
 import NewTrip from "./pages/NewTrip";
 import TripDetail from "./pages/TripDetail";
@@ -16,6 +17,7 @@ const RoutePage = lazy(() => import("./pages/RoutePage"));
 export default function App() {
   return (
     <div className="app-shell">
+      <UpdateBanner />
       <div className="no-scrollbar flex-1 overflow-y-auto pb-2">
         <Routes>
           <Route path="/" element={<Home />} />
