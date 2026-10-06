@@ -14,6 +14,12 @@ const PALETTE = [
   "#84cc16", // lime
 ];
 
+/** Color for a trip day (Day 1 = first palette color, cycling). */
+export function dayColor(dayNumber: number): string {
+  const n = PALETTE.length;
+  return PALETTE[(((dayNumber - 1) % n) + n) % n];
+}
+
 /** Deterministically maps a country code to a palette color, so the same country always renders the same color. */
 export function colorForCountry(countryCode: string): string {
   let hash = 0;

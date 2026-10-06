@@ -36,6 +36,9 @@ export interface Photo {
   dayId: string;
   blob: Blob;
   createdAt: number;
+  takenAt?: number; // EXIF capture time (ms); set once metadata has been read
+  lat?: number; // EXIF GPS, when the photo carries it
+  lng?: number;
 }
 
 export const EXPENSE_CATEGORIES = [

@@ -9,6 +9,9 @@ interface BackupPhoto {
   tripId: string;
   dayId: string;
   createdAt: number;
+  takenAt?: number;
+  lat?: number;
+  lng?: number;
   data: string; // data URL
 }
 
@@ -57,6 +60,9 @@ export async function exportBackup(): Promise<BackupSummary> {
       tripId: p.tripId,
       dayId: p.dayId,
       createdAt: p.createdAt,
+      takenAt: p.takenAt,
+      lat: p.lat,
+      lng: p.lng,
       data: await blobToDataURL(p.blob),
     })),
   );
@@ -109,6 +115,9 @@ export async function importBackup(file: File): Promise<BackupSummary> {
       tripId: p.tripId,
       dayId: p.dayId,
       createdAt: p.createdAt,
+      takenAt: p.takenAt,
+      lat: p.lat,
+      lng: p.lng,
       blob: await dataURLToBlob(p.data),
     })),
   );

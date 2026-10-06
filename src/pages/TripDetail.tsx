@@ -3,14 +3,13 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { v4 as uuid } from "uuid";
 import { db } from "../db";
-import type { DayEntry } from "../types";
 import { getCountryLabel } from "../data/countries";
 import { formatDateKR } from "../utils/format";
-import { getCaptureMoment, toISODate } from "../utils/exif";
-import { renumberDays } from "../utils/days";
+import { analyzePhotos, attachPlaces, savePhotosToTrip } from "../utils/photoImport";
 import { generateTripShareCard, shareTripCard } from "../utils/shareCard";
 import PhotoImg from "../components/PhotoImg";
 import PhotoCollage from "../components/PhotoCollage";
+import TripTabs from "../components/TripTabs";
 
 export default function TripDetail() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -20,6 +19,7 @@ export default function TripDetail() {
   const [organizing, setOrganizing] = useState<{ done: number; total: number } | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [organizeMessage, setOrganizeMessage] = useState("");
 
   const trip = useLiveQuery(() => db.trips.get(tripId!), [tripId]);
   const days = useLiveQuery(
@@ -34,57 +34,25 @@ export default function TripDetail() {
     e.target.value = "";
     if (files.length === 0) return;
 
+    setOrganizeMessage("");
     setOrganizing({ done: 0, total: files.length });
-
-    const moments: { file: File; date: string; time: number }[] = [];
-    for (const file of files) {
-      const moment = await getCaptureMoment(file);
-      moments.push({ file, date: toISODate(moment), time: moment.getTime() });
-      setOrganizing((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev));
+    try {
+      const analyzed = await analyzePhotos(files, (done, total) =>
+        setOrganizing({ done, total }),
+      );
+      await attachPlaces(analyzed);
+      await savePhotosToTrip(tripId!, analyzed);
+      const located = analyzed.filter((p) => p.lat != null).length;
+      setOrganizeMessage(
+        located > 0
+          ? `사진 ${analyzed.length}장을 정리했어요. 위치가 있는 사진은 ${located}장이에요.`
+          : `사진 ${analyzed.length}장을 정리했어요. 위치 정보가 담긴 사진은 없었어요.`,
+      );
+    } catch {
+      setOrganizeMessage("사진을 읽는 중 문제가 생겼어요. 20~50장씩 나눠서 다시 시도해 주세요.");
+    } finally {
+      setOrganizing(null);
     }
-    moments.sort((a, b) => a.time - b.time);
-
-    const groups = new Map<string, File[]>();
-    for (const m of moments) {
-      (groups.get(m.date) ?? groups.set(m.date, []).get(m.date)!).push(m.file);
-    }
-
-    const existingDays = await db.days.where("tripId").equals(tripId!).toArray();
-    const byDate = new Map(existingDays.map((d) => [d.date, d]));
-
-    for (const [date, dateFiles] of groups) {
-      let day = byDate.get(date);
-      if (!day) {
-        const now = Date.now();
-        day = {
-          id: uuid(),
-          tripId: tripId!,
-          dayNumber: 0,
-          date,
-          title: "",
-          photoIds: [],
-          createdAt: now,
-          updatedAt: now,
-        } satisfies DayEntry;
-        byDate.set(date, day);
-      }
-      for (const file of dateFiles) {
-        const photoId = uuid();
-        await db.photos.add({
-          id: photoId,
-          tripId: tripId!,
-          dayId: day.id,
-          blob: file,
-          createdAt: Date.now(),
-        });
-        day.photoIds.push(photoId);
-      }
-      day.updatedAt = Date.now();
-      await db.days.put(day);
-    }
-
-    await renumberDays(tripId!);
-    setOrganizing(null);
   }
 
   async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -195,17 +163,7 @@ export default function TripDetail() {
         </p>
       )}
 
-      <div className="flex border-b border-gray-100 px-4">
-        <div className="flex-1 border-b-2 border-indigo-600 py-3 text-center text-sm font-semibold text-indigo-600">
-          기록
-        </div>
-        <Link
-          to={`/trips/${trip.id}/expenses`}
-          className="flex-1 border-b-2 border-transparent py-3 text-center text-sm font-semibold text-gray-400"
-        >
-          지출/정산
-        </Link>
-      </div>
+      <TripTabs tripId={trip.id} active="journal" />
 
       <div className="px-4">
         {days && days.length === 0 && (
@@ -295,11 +253,14 @@ export default function TripDetail() {
         </div>
         {organizing && (
           <p className="mt-2 text-center text-xs text-gray-400">
-            촬영일 분석 중... {organizing.done}/{organizing.total}
+            촬영일·위치 분석 중... {organizing.done}/{organizing.total}
           </p>
         )}
+        {organizeMessage && (
+          <p className="mt-2 text-center text-xs font-medium text-indigo-600">{organizeMessage}</p>
+        )}
         <p className="mt-2 text-center text-[11px] text-gray-400">
-          사진의 촬영일을 읽어 자동으로 Day별로 정리해줘요.
+          사진의 촬영일과 위치를 읽어 Day별로 정리하고, 동선 탭에 길을 그려줘요.
         </p>
       </div>
     </div>

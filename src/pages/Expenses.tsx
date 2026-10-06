@@ -6,6 +6,7 @@ import { db } from "../db";
 import { EXPENSE_CATEGORIES, type Expense, type ExpenseCategory } from "../types";
 import { computeSettlement, sumByCategory } from "../utils/settlement";
 import { formatMoney, formatDateKR } from "../utils/format";
+import TripTabs from "../components/TripTabs";
 
 export default function Expenses() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -59,17 +60,7 @@ export default function Expenses() {
         </div>
       </div>
 
-      <div className="flex border-b border-gray-100 px-4">
-        <Link
-          to={`/trips/${trip.id}`}
-          className="flex-1 border-b-2 border-transparent py-3 text-center text-sm font-semibold text-gray-400"
-        >
-          기록
-        </Link>
-        <div className="flex-1 border-b-2 border-indigo-600 py-3 text-center text-sm font-semibold text-indigo-600">
-          지출/정산
-        </div>
-      </div>
+      <TripTabs tripId={trip.id} active="expenses" />
 
       <div className="px-4">
         <div className="mt-5 rounded-2xl bg-gray-900 p-5 text-white">

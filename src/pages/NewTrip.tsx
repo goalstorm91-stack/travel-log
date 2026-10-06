@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { v4 as uuid } from "uuid";
 import { db } from "../db";
 import { COUNTRIES } from "../data/countries";
@@ -62,7 +62,21 @@ export default function NewTrip() {
 
   return (
     <div className="px-4 pt-6 pb-4">
-      <h1 className="mb-5 text-xl font-bold text-gray-900">새 여행 만들기</h1>
+      <h1 className="mb-4 text-xl font-bold text-gray-900">새 여행 만들기</h1>
+
+      <Link
+        to="/trips/from-photos"
+        className="mb-6 flex items-center gap-3 rounded-2xl bg-indigo-50 p-4"
+      >
+        <span className="text-2xl">📷</span>
+        <span className="flex-1">
+          <span className="block text-sm font-bold text-indigo-700">사진으로 한 번에 만들기</span>
+          <span className="block text-xs text-indigo-500">
+            사진만 고르면 기간·장소·Day가 자동으로 채워져요
+          </span>
+        </span>
+        <span className="text-indigo-400">›</span>
+      </Link>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div>

@@ -62,3 +62,23 @@ body {
     background: #fff;
   }
 }
+
+/* Playback marker on the route map: a dot with a pulsing halo. */
+.route-mover span {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #312e81;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 0 rgba(49, 46, 129, 0.5), 0 2px 6px rgba(15, 23, 42, 0.4);
+  animation: route-pulse 1.4s ease-out infinite;
+}
+@keyframes route-pulse {
+  70% {
+    box-shadow: 0 0 0 14px rgba(49, 46, 129, 0), 0 2px 6px rgba(15, 23, 42, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(49, 46, 129, 0), 0 2px 6px rgba(15, 23, 42, 0.4);
+  }
+}

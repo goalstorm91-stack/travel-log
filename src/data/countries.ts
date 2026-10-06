@@ -8,6 +8,10 @@ export function getCountryLabel(name: string): string {
   return COUNTRIES.find((c) => c.name === name)?.nameKR ?? name;
 }
 
+export function findCountryByName(name: string): CountryInfo | undefined {
+  return COUNTRIES.find((c) => c.name === name);
+}
+
 export function getCountryById(id: string): CountryInfo | undefined {
   return COUNTRIES.find((c) => c.id === id);
 }

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { v4 as uuid } from "uuid";
 import { db } from "../db";
 import type { DayEntry } from "../types";
+import { readPhotoMeta } from "../utils/exif";
 import PhotoImg from "../components/PhotoImg";
 
 export default function DayEditor() {
@@ -65,12 +66,16 @@ export default function DayEditor() {
     const newIds: string[] = [];
     for (const file of files) {
       const id = uuid();
+      const meta = await readPhotoMeta(file, file.lastModified);
       await db.photos.add({
         id,
         tripId: tripId!,
         dayId,
         blob: file,
         createdAt: Date.now(),
+        takenAt: meta.takenAt,
+        lat: meta.lat,
+        lng: meta.lng,
       });
       newIds.push(id);
     }
