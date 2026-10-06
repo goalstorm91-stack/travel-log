@@ -119,12 +119,14 @@ export default function Home() {
           </div>
         ))}
 
-      <p className="mt-10 pb-2 text-center text-[11px] text-gray-300">
-        Made by Seo Taeseong, 2026 ·{" "}
-        <Link to="/notice" className="underline underline-offset-2">
+      <footer className="mt-10 flex flex-col items-center gap-1.5 pb-2 text-center">
+        <p className="text-sm font-semibold tracking-wide text-gray-700">
+          Made by Seo Taeseong, 2026
+        </p>
+        <Link to="/notice" className="text-xs text-gray-400 underline underline-offset-2">
           이용 안내 · 고지
         </Link>
-      </p>
+      </footer>
     </div>
   );
 }

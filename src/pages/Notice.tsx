@@ -129,7 +129,9 @@ export default function Notice() {
         </p>
       </Section>
 
-      <p className="text-center text-[11px] text-gray-300">Made by Seo Taeseong, 2026</p>
+      <p className="text-center text-sm font-semibold tracking-wide text-gray-700">
+        Made by Seo Taeseong, 2026
+      </p>
     </div>
   );
 }
