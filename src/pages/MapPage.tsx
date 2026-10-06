@@ -51,7 +51,7 @@ export default function MapPage() {
   function focusOnCountry(code: string, ts: Trip[]) {
     const withCoords = ts.filter((t) => t.cityLat != null && t.cityLng != null);
     if (withCoords.length === 1) {
-      mapRef.current?.focusPoint(withCoords[0].cityLat!, withCoords[0].cityLng!, 12);
+      mapRef.current?.focusPoint(withCoords[0].cityLat!, withCoords[0].cityLng!, 11);
       setActivePinId(withCoords[0].id);
     } else {
       mapRef.current?.focusCountry(code);
@@ -71,7 +71,7 @@ export default function MapPage() {
   function handlePinClick(tripId: string) {
     const trip = (trips ?? []).find((t) => t.id === tripId);
     if (!trip || trip.cityLat == null || trip.cityLng == null) return;
-    mapRef.current?.focusPoint(trip.cityLat, trip.cityLng, 13);
+    mapRef.current?.focusPoint(trip.cityLat, trip.cityLng, 12);
     setActivePinId(tripId);
     setFocused(true);
   }

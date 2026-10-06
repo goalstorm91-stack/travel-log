@@ -1,7 +1,14 @@
-import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useEffect, useRef, useState } from "react";
+import {
+  LngLatBounds,
+  Map as MLMap,
+  Marker,
+  NavigationControl,
+  type GeoJSONSource,
+} from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { dayColor } from "../utils/colors";
+import { loadBaseStyle } from "../utils/mapStyle";
 import type { Stop } from "../utils/route";
 
 interface LatLng {
@@ -9,24 +16,27 @@ interface LatLng {
   lng: number;
 }
 
-function stopIcon(stop: Stop, order: number, selected: boolean): L.DivIcon {
+const EMPTY_LINES = { type: "FeatureCollection" as const, features: [] };
+
+function stopElement(stop: Stop, order: number, selected: boolean): HTMLDivElement {
   const size = selected ? 34 : 26;
   const color = dayColor(stop.dayNumber);
-  const ring = selected ? `box-shadow:0 0 0 4px ${color}55,0 2px 6px rgba(15,23,42,.35);` : "box-shadow:0 1px 4px rgba(15,23,42,.35);";
-  return L.divIcon({
-    className: "",
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;${ring}color:#fff;font:700 ${selected ? 13 : 11}px/${size - 5}px -apple-system,sans-serif;text-align:center;">${order}</div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
+  const ring = selected
+    ? `box-shadow:0 0 0 4px ${color}55,0 2px 6px rgba(15,23,42,.35);`
+    : "box-shadow:0 1px 4px rgba(15,23,42,.35);";
+  const el = document.createElement("div");
+  el.style.cursor = "pointer";
+  el.innerHTML = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #fff;${ring}color:#fff;font:700 ${selected ? 13 : 11}px/${size - 5}px -apple-system,sans-serif;text-align:center;">${order}</div>`;
+  return el;
 }
 
-const moverIcon = L.divIcon({
-  className: "route-mover",
-  html: "<span></span>",
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-});
+function moverElement(): HTMLDivElement {
+  const el = document.createElement("div");
+  el.className = "route-mover";
+  el.style.pointerEvents = "none";
+  el.innerHTML = "<span></span>";
+  return el;
+}
 
 export default function RouteMap({
   stops,
@@ -40,128 +50,192 @@ export default function RouteMap({
   selectedIdx: number | null;
   onSelect: (index: number) => void;
   mover: LatLng | null;
-  trail: [number, number][] | null;
+  trail: [number, number][] | null; // [lat, lng] pairs
   follow: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const lineLayerRef = useRef<L.LayerGroup | null>(null);
-  const markerLayerRef = useRef<L.LayerGroup | null>(null);
-  const moverRef = useRef<L.Marker | null>(null);
-  const trailRef = useRef<L.Polyline | null>(null);
+  const mapRef = useRef<MLMap | null>(null);
+  const moverRef = useRef<Marker | null>(null);
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
-  // Init map once.
+  // Init the map once (the style is fetched first, so this is async), and add
+  // the empty route/trail sources + layers that later effects fill in.
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || mapRef.current) return;
-    const map = L.map(container, { center: [20, 10], zoom: 2, minZoom: 2, maxZoom: 18 });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(map);
-    lineLayerRef.current = L.layerGroup().addTo(map);
-    markerLayerRef.current = L.layerGroup().addTo(map);
-    mapRef.current = map;
+    if (!container) return;
+    let cancelled = false;
+    let map: MLMap | null = null;
+
+    loadBaseStyle().then(({ style }) => {
+      if (cancelled) return;
+      let m: MLMap;
+      try {
+        m = new MLMap({
+          container,
+          style,
+          center: [10, 20],
+          zoom: 1,
+          minZoom: 0.6,
+          maxZoom: 17,
+          attributionControl: { compact: true },
+        });
+      } catch {
+        setFailed(true); // e.g. no WebGL
+        return;
+      }
+      map = m;
+      m.addControl(new NavigationControl({ showCompass: false }), "top-left");
+      m.on("error", (e) => console.warn("[map]", e.error?.message ?? e));
+      m.on("load", () => {
+        m.addSource("route-lines", { type: "geojson", data: EMPTY_LINES });
+        m.addLayer({
+          id: "route-solid",
+          type: "line",
+          source: "route-lines",
+          filter: ["==", ["get", "dashed"], false],
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.55 },
+        });
+        m.addLayer({
+          id: "route-dashed",
+          type: "line",
+          source: "route-lines",
+          filter: ["==", ["get", "dashed"], true],
+          layout: { "line-cap": "butt" },
+          paint: { "line-color": "#94a3b8", "line-width": 3, "line-opacity": 0.8, "line-dasharray": [2, 2.5] },
+        });
+        m.addSource("route-trail", { type: "geojson", data: EMPTY_LINES });
+        m.addLayer({
+          id: "route-trail",
+          type: "line",
+          source: "route-trail",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#312e81", "line-width": 5, "line-opacity": 0.9 },
+        });
+        setReady(true);
+      });
+      mapRef.current = m;
+    });
 
     return () => {
-      map.remove();
-      // Leaflet leaves a marker on the container that breaks re-init under StrictMode.
-      delete (container as unknown as { _leaflet_id?: number })._leaflet_id;
-      mapRef.current = null;
-      lineLayerRef.current = null;
-      markerLayerRef.current = null;
+      cancelled = true;
+      moverRef.current?.remove();
       moverRef.current = null;
-      trailRef.current = null;
+      map?.remove();
+      mapRef.current = null;
+      setReady(false);
     };
   }, []);
 
   // Route lines + camera fit, when the stops change.
   useEffect(() => {
     const map = mapRef.current;
-    const lines = lineLayerRef.current;
-    if (!map || !lines) return;
-    lines.clearLayers();
+    if (!map || !ready) return;
 
+    const features = [];
     for (let i = 1; i < stops.length; i++) {
       const a = stops[i - 1];
       const b = stops[i];
       const sameDay = a.dayNumber === b.dayNumber;
-      L.polyline(
-        [
-          [a.lat, a.lng],
-          [b.lat, b.lng],
-        ],
-        sameDay
-          ? { color: dayColor(b.dayNumber), weight: 4, opacity: 0.55 }
-          : { color: "#94a3b8", weight: 3, opacity: 0.8, dashArray: "6 8" },
-      ).addTo(lines);
+      features.push({
+        type: "Feature" as const,
+        properties: { color: dayColor(b.dayNumber), dashed: !sameDay },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: [
+            [a.lng, a.lat],
+            [b.lng, b.lat],
+          ],
+        },
+      });
     }
+    (map.getSource("route-lines") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features,
+    });
 
     if (stops.length === 1) {
-      map.setView([stops[0].lat, stops[0].lng], 14, { animate: false });
+      map.jumpTo({ center: [stops[0].lng, stops[0].lat], zoom: 13 });
     } else if (stops.length > 1) {
-      map.fitBounds(
-        L.latLngBounds(stops.map((s) => [s.lat, s.lng] as [number, number])),
-        { padding: [36, 36], maxZoom: 15, animate: false },
-      );
+      const bounds = new LngLatBounds();
+      stops.forEach((s) => bounds.extend([s.lng, s.lat]));
+      map.fitBounds(bounds, { padding: 44, maxZoom: 14, animate: false });
     }
-  }, [stops]);
+  }, [ready, stops]);
 
   // Numbered stop markers (restyled when the selection changes).
   useEffect(() => {
-    const markers = markerLayerRef.current;
-    if (!markers) return;
-    markers.clearLayers();
-    stops.forEach((stop, i) => {
-      L.marker([stop.lat, stop.lng], {
-        icon: stopIcon(stop, i + 1, i === selectedIdx),
-        zIndexOffset: i === selectedIdx ? 500 : 0,
-      })
-        .on("click", () => onSelectRef.current(i))
-        .addTo(markers);
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const markers = stops.map((stop, i) => {
+      const el = stopElement(stop, i + 1, i === selectedIdx);
+      el.style.zIndex = i === selectedIdx ? "5" : "1";
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onSelectRef.current(i);
+      });
+      return new Marker({ element: el, anchor: "center" })
+        .setLngLat([stop.lng, stop.lat])
+        .addTo(map);
     });
-  }, [stops, selectedIdx]);
+    return () => markers.forEach((m) => m.remove());
+  }, [ready, stops, selectedIdx]);
 
-  // Playback marker + trail.
+  // Playback marker.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !ready) return;
     if (!mover) {
       moverRef.current?.remove();
       moverRef.current = null;
       return;
     }
     if (!moverRef.current) {
-      moverRef.current = L.marker([mover.lat, mover.lng], {
-        icon: moverIcon,
-        interactive: false,
-        zIndexOffset: 1000,
-      }).addTo(map);
+      moverRef.current = new Marker({ element: moverElement(), anchor: "center" })
+        .setLngLat([mover.lng, mover.lat])
+        .addTo(map);
     } else {
-      moverRef.current.setLatLng([mover.lat, mover.lng]);
+      moverRef.current.setLngLat([mover.lng, mover.lat]);
     }
     if (follow) {
-      map.setView([mover.lat, mover.lng], Math.max(map.getZoom(), 12), { animate: false });
+      map.jumpTo({ center: [mover.lng, mover.lat], zoom: Math.max(map.getZoom(), 11) });
     }
-  }, [mover, follow]);
+  }, [ready, mover, follow]);
 
+  // Trail drawn behind the playback marker.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    if (!trail || trail.length < 2) {
-      trailRef.current?.remove();
-      trailRef.current = null;
-      return;
-    }
-    if (!trailRef.current) {
-      trailRef.current = L.polyline(trail, { color: "#312e81", weight: 5, opacity: 0.9 }).addTo(map);
-    } else {
-      trailRef.current.setLatLngs(trail);
-    }
-  }, [trail]);
+    if (!map || !ready) return;
+    const data =
+      trail && trail.length >= 2
+        ? {
+            type: "FeatureCollection" as const,
+            features: [
+              {
+                type: "Feature" as const,
+                properties: {},
+                geometry: {
+                  type: "LineString" as const,
+                  coordinates: trail.map(([lat, lng]) => [lng, lat]),
+                },
+              },
+            ],
+          }
+        : EMPTY_LINES;
+    (map.getSource("route-trail") as GeoJSONSource).setData(data as never);
+  }, [ready, trail]);
 
-  return <div ref={containerRef} className="h-80 w-full" />;
+  return (
+    <div className="relative h-80 w-full bg-sky-50">
+      <div ref={containerRef} className="h-full w-full" />
+      {failed && (
+        <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-xs text-gray-500">
+          이 기기에서는 지도를 표시할 수 없어요. 브라우저를 최신 버전으로 업데이트해 주세요.
+        </p>
+      )}
+    </div>
+  );
 }
