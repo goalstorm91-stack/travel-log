@@ -118,7 +118,9 @@ export default function MapPage() {
             📍 {getCountryLabel(activeTrip.countryName)} {activeTrip.city} · {activeTrip.title} 보기
           </Link>
         ) : (
-          hoveredName && getCountryLabel(hoveredName)
+          (hoveredName && getCountryLabel(hoveredName)) || (
+            <span className="text-gray-400">밀어서 지구본을 돌리고, 나라나 핀을 눌러 보세요</span>
+          )
         )}
       </div>
 

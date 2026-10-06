@@ -29,8 +29,19 @@ export interface WorldMapHandle {
   reset: () => void;
 }
 
-const WORLD_CENTER: [number, number] = [10, 20]; // [lng, lat]
-const WORLD_ZOOM = 1;
+// The map is a globe: start over East Asia, small enough to see the whole sphere.
+const WORLD_CENTER: [number, number] = [127, 33]; // [lng, lat]
+const WORLD_ZOOM = 0.9;
+const SPIN_DEG_PER_SEC = 5;
+
+// Thin atmosphere around the globe that fades out as you zoom in to the flat map.
+const GLOBE_SKY = {
+  "sky-color": "#7cc0f5",
+  "horizon-color": "#d6ecfb",
+  "fog-color": "#ffffff",
+  "sky-horizon-blend": 0.6,
+  "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 4, 0.8, 7, 0],
+};
 
 // A few features (Kosovo, N. Cyprus...) have no id in the source data.
 function countryKey(c: CountryFeature): string {
@@ -66,6 +77,7 @@ const WorldMap = forwardRef<
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const onlineRef = useRef(true);
+  const spinningRef = useRef(true); // idle spin, until the user (or a focus call) takes over
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -106,6 +118,7 @@ const WorldMap = forwardRef<
     const map = mapRef.current;
     const feat = countries.find((c) => countryKey(c) === countryCode);
     if (!map || !feat) return;
+    spinningRef.current = false;
     const [[minLng, minLat], [maxLng, maxLat]] = geoBounds(feat as never);
     map.fitBounds(
       [
@@ -133,12 +146,13 @@ const WorldMap = forwardRef<
       try {
         created = new MLMap({
           container,
-          style,
+          style: { ...style, projection: { type: "globe" }, sky: GLOBE_SKY as never },
           center: WORLD_CENTER,
           zoom: WORLD_ZOOM,
-          minZoom: 0.6,
+          minZoom: 0.4,
           maxZoom: 16,
           attributionControl: { compact: true },
+          canvasContextAttributes: { antialias: true, preserveDrawingBuffer: import.meta.env.DEV },
         });
       } catch {
         setFailed(true); // e.g. no WebGL
@@ -171,8 +185,11 @@ const WorldMap = forwardRef<
     }
 
     map.addSource("countries", { type: "geojson", data: countryData as never });
-    // Keep tints under the basemap's labels.
-    const beforeId = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
+    // Where to put the tints: online, right under the roads (above land cover) so
+    // roads and labels stay crisp on top; offline there is no basemap to sit under.
+    const styleLayers = map.getStyle().layers;
+    const waterway = styleLayers.find((l) => l.id === "waterway");
+    const beforeId = waterway?.id ?? styleLayers.find((l) => l.type === "symbol")?.id;
 
     if (!onlineRef.current) {
       // No basemap available: draw every country so the map is still usable offline.
@@ -191,7 +208,11 @@ const WorldMap = forwardRef<
         type: "fill",
         source: "countries",
         filter: ["==", ["get", "visited"], true],
-        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.42 },
+        paint: {
+          "fill-color": ["get", "color"],
+          // strong on the globe, fading out as you zoom into streets so the basemap stays readable
+          "fill-opacity": ["interpolate", ["linear"], ["zoom"], 0, 0.45, 4, 0.4, 8, 0.14, 11, 0.04],
+        },
       },
       beforeId,
     );
@@ -201,7 +222,11 @@ const WorldMap = forwardRef<
         type: "line",
         source: "countries",
         filter: ["==", ["get", "visited"], true],
-        paint: { "line-color": "#ffffff", "line-width": 1.2 },
+        paint: {
+          "line-color": "#ffffff",
+          "line-width": 1.2,
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 0, 1, 8, 0.6, 11, 0],
+        },
       },
       beforeId,
     );
@@ -215,6 +240,13 @@ const WorldMap = forwardRef<
       },
       beforeId,
     );
+
+    // Our country shapes are low-resolution, so they spill over the real coastline.
+    // Repaint the basemap's water over the tint to cut it back to the true shore.
+    const water = styleLayers.find((l) => l.id === "water");
+    if (water && onlineRef.current) {
+      map.addLayer({ ...water, id: "water-over-tint" } as never, beforeId);
+    }
 
     let hovered: string | null = null;
     map.on("click", "country-hit", (e) => {
@@ -238,6 +270,37 @@ const WorldMap = forwardRef<
     });
   }, [ready, countryData]);
 
+  // Slow idle spin so it reads as a globe; any touch/scroll hands control to the user.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    let last = performance.now();
+    const stop = () => {
+      spinningRef.current = false;
+      cancelAnimationFrame(raf);
+    };
+    const tick = (now: number) => {
+      if (!spinningRef.current) return;
+      const dt = Math.min(now - last, 100); // don't jump after a hidden-tab gap
+      last = now;
+      const c = map.getCenter();
+      map.setCenter([c.lng + (SPIN_DEG_PER_SEC * dt) / 1000, c.lat]);
+      raf = requestAnimationFrame(tick);
+    };
+    if (spinningRef.current) raf = requestAnimationFrame(tick);
+    map.on("mousedown", stop);
+    map.on("touchstart", stop);
+    map.on("wheel", stop);
+    return () => {
+      cancelAnimationFrame(raf);
+      map.off("mousedown", stop);
+      map.off("touchstart", stop);
+      map.off("wheel", stop);
+    };
+  }, [ready]);
+
   // Pin markers.
   useEffect(() => {
     const map = mapRef.current;
@@ -258,11 +321,16 @@ const WorldMap = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      focusCountry: (code) => zoomRef.current(code),
+      focusCountry: (code) => {
+        spinningRef.current = false;
+        zoomRef.current(code);
+      },
       focusPoint(lat, lng, zoom = 11) {
+        spinningRef.current = false;
         mapRef.current?.flyTo({ center: [lng, lat], zoom, duration: 800, essential: true });
       },
       reset() {
+        spinningRef.current = false;
         mapRef.current?.flyTo({ center: WORLD_CENTER, zoom: WORLD_ZOOM, duration: 800, essential: true });
       },
     }),
@@ -270,7 +338,7 @@ const WorldMap = forwardRef<
   );
 
   return (
-    <div className="relative h-72 w-full bg-sky-50">
+    <div className="relative h-80 w-full bg-gradient-to-b from-slate-900 to-indigo-950">
       <div ref={containerRef} className="h-full w-full" />
       {failed && (
         <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-xs text-gray-500">
