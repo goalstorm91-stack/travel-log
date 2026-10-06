@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { v4 as uuid } from "uuid";
 import { db } from "../db";
 import type { DayEntry } from "../types";
@@ -140,17 +140,27 @@ export default function DayEditor() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-4">
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">
-          {isNew ? "하루 기록 추가" : "하루 기록 수정"}
-        </h1>
+    <div className="px-4 pt-4 pb-4">
+      <div className="mb-4 flex items-center justify-between">
+        <Link
+          to={`/trips/${tripId}`}
+          aria-label="여행 기록으로 돌아가기"
+          className="flex h-10 items-center gap-1 rounded-full bg-gray-100 px-4 text-sm font-semibold text-gray-700"
+        >
+          <span className="text-base leading-none">‹</span> 이전
+        </Link>
         {!isNew && (
-          <button onClick={handleDelete} className="text-xs font-semibold text-red-500">
-            삭제
+          <button
+            onClick={handleDelete}
+            className="flex h-10 items-center rounded-full bg-red-50 px-4 text-[13px] font-semibold text-red-500"
+          >
+            🗑 삭제
           </button>
         )}
       </div>
+      <h1 className="mb-5 text-xl font-bold text-gray-900">
+        {isNew ? "하루 기록 추가" : "하루 기록 수정"}
+      </h1>
 
       <div className="flex flex-col gap-5">
         <div className="flex gap-3">

@@ -213,9 +213,10 @@ export default function TripDetail() {
               </div>
               <Link
                 to={`/trips/${trip.id}/days/${day.id}`}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-500"
+                aria-label={`Day ${day.dayNumber} 수정`}
+                className="flex h-11 items-center gap-1.5 rounded-full bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm active:bg-indigo-700"
               >
-                ✎
+                <span className="text-xl leading-none">✎</span> 수정
               </Link>
             </div>
 
