@@ -5,6 +5,7 @@ import { v4 as uuid } from "uuid";
 import { db } from "../db";
 import type { DayEntry } from "../types";
 import { readPhotoMeta } from "../utils/exif";
+import { prepareImageForStorage } from "../utils/imageStore";
 import PhotoImg from "../components/PhotoImg";
 
 export default function DayEditor() {
@@ -64,14 +65,22 @@ export default function DayEditor() {
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     const newIds: string[] = [];
+    let failedCount = 0;
     for (const file of files) {
       const id = uuid();
-      const meta = await readPhotoMeta(file, file.lastModified);
+      const meta = await readPhotoMeta(file, file.lastModified); // read before re-encoding drops EXIF
+      let blob: Blob;
+      try {
+        blob = await prepareImageForStorage(file);
+      } catch {
+        failedCount++;
+        continue;
+      }
       await db.photos.add({
         id,
         tripId: tripId!,
         dayId,
-        blob: file,
+        blob,
         createdAt: Date.now(),
         takenAt: meta.takenAt,
         lat: meta.lat,
@@ -80,6 +89,7 @@ export default function DayEditor() {
       newIds.push(id);
     }
     setPhotoIds((prev) => [...prev, ...newIds]);
+    if (failedCount > 0) setError(`사진 ${failedCount}장은 변환하지 못해 건너뛰었어요.`);
     e.target.value = "";
   }
 

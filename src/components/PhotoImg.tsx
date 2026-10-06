@@ -5,10 +5,13 @@ export default function PhotoImg({
   photoId,
   className,
   onClick,
+  fit = "cover",
 }: {
   photoId: string;
   className?: string;
   onClick?: () => void;
+  /** "cover" crops to fill the box (thumbnails); "contain" shows the whole photo. */
+  fit?: "cover" | "contain";
 }) {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -34,7 +37,7 @@ export default function PhotoImg({
     <img
       src={url}
       onClick={onClick}
-      className={`object-cover ${className ?? ""}`}
+      className={`${fit === "contain" ? "object-contain" : "object-cover"} ${className ?? ""}`}
       loading="lazy"
     />
   );

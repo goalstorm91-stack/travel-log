@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { v4 as uuid } from "uuid";
 import { db } from "../db";
 import { getCountryLabel } from "../data/countries";
 import { formatDateKR } from "../utils/format";
 import { analyzePhotos, attachPlaces, savePhotosToTrip } from "../utils/photoImport";
+import { prepareImageForStorage } from "../utils/imageStore";
 import { generateTripShareCard, shareTripCard } from "../utils/shareCard";
 import PhotoImg from "../components/PhotoImg";
 import PhotoCollage from "../components/PhotoCollage";
@@ -16,10 +17,13 @@ export default function TripDetail() {
   const navigate = useNavigate();
   const coverInputRef = useRef<HTMLInputElement>(null);
   const autoOrganizeInputRef = useRef<HTMLInputElement>(null);
-  const [organizing, setOrganizing] = useState<{ done: number; total: number } | null>(null);
+  const [organizing, setOrganizing] = useState<{ done: number; total: number; label: string } | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
-  const [organizeMessage, setOrganizeMessage] = useState("");
+  const location = useLocation();
+  const [organizeMessage, setOrganizeMessage] = useState(
+    (location.state as { notice?: string } | null)?.notice ?? "",
+  );
 
   const trip = useLiveQuery(() => db.trips.get(tripId!), [tripId]);
   const days = useLiveQuery(
@@ -35,19 +39,23 @@ export default function TripDetail() {
     if (files.length === 0) return;
 
     setOrganizeMessage("");
-    setOrganizing({ done: 0, total: files.length });
+    const analyzeLabel = "촬영일·위치 분석 중";
+    setOrganizing({ done: 0, total: files.length, label: analyzeLabel });
     try {
       const analyzed = await analyzePhotos(files, (done, total) =>
-        setOrganizing({ done, total }),
+        setOrganizing({ done, total, label: analyzeLabel }),
       );
       await attachPlaces(analyzed);
-      await savePhotosToTrip(tripId!, analyzed);
-      const located = analyzed.filter((p) => p.lat != null).length;
-      setOrganizeMessage(
-        located > 0
-          ? `사진 ${analyzed.length}장을 정리했어요. 위치가 있는 사진은 ${located}장이에요.`
-          : `사진 ${analyzed.length}장을 정리했어요. 위치 정보가 담긴 사진은 없었어요.`,
+      const { saved, failed } = await savePhotosToTrip(tripId!, analyzed, (done, total) =>
+        setOrganizing({ done, total, label: "사진 저장 중" }),
       );
+      const located = analyzed.filter((p) => p.lat != null).length;
+      const parts = [
+        `사진 ${saved}장을 정리했어요.`,
+        located > 0 ? `위치가 있는 사진은 ${located}장이에요.` : "위치 정보가 담긴 사진은 없었어요.",
+      ];
+      if (failed > 0) parts.push(`${failed}장은 변환하지 못해 건너뛰었어요.`);
+      setOrganizeMessage(parts.join(" "));
     } catch {
       setOrganizeMessage("사진을 읽는 중 문제가 생겼어요. 20~50장씩 나눠서 다시 시도해 주세요.");
     } finally {
@@ -58,12 +66,20 @@ export default function TripDetail() {
   async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    let blob: Blob;
+    try {
+      blob = await prepareImageForStorage(file);
+    } catch {
+      setOrganizeMessage("이 사진은 변환하지 못했어요. 다른 사진을 골라 주세요.");
+      e.target.value = "";
+      return;
+    }
     const photoId = uuid();
     await db.photos.add({
       id: photoId,
       tripId: trip!.id,
       dayId: "__cover__",
-      blob: file,
+      blob,
       createdAt: Date.now(),
     });
     await db.trips.update(trip!.id, { coverPhotoId: photoId });
@@ -253,7 +269,7 @@ export default function TripDetail() {
         </div>
         {organizing && (
           <p className="mt-2 text-center text-xs text-gray-400">
-            촬영일·위치 분석 중... {organizing.done}/{organizing.total}
+            {organizing.label}... {organizing.done}/{organizing.total}
           </p>
         )}
         {organizeMessage && (

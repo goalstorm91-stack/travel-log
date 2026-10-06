@@ -1,13 +1,20 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../db";
 import { exportBackup, importBackup, clearAllData, type BackupSummary } from "../utils/backup";
+import { getKeepOriginals, setKeepOriginals } from "../utils/settings";
+import { formatBytes, getStorageInfo, requestPersistentStorage, type StorageInfo } from "../utils/storage";
 
 export default function Settings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  const [keepOriginals, setKeepOriginalsState] = useState(getKeepOriginals);
+  const [storage, setStorage] = useState<StorageInfo | null>(null);
+  const refreshStorage = () => void getStorageInfo().then(setStorage);
+  useEffect(refreshStorage, []);
 
   const counts = useLiveQuery(async () => ({
     trips: await db.trips.count(),
@@ -122,6 +129,50 @@ export default function Settings() {
         />
       </section>
 
+      <section className="mb-6">
+        <h2 className="mb-1 text-sm font-bold text-gray-800">사진 저장 방식</h2>
+        <p className="mb-3 text-xs text-gray-400">
+          기본은 긴 변 1600px의 JPEG로 줄여 저장해서 저장 공간과 백업 파일 크기를 아껴요. HEIC 사진은 항상
+          JPEG로 변환돼요. 이미 저장된 사진에는 영향이 없어요.
+        </p>
+        <label className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3">
+          <span className="text-sm font-medium text-gray-800">원본 크기로 저장</span>
+          <input
+            type="checkbox"
+            checked={keepOriginals}
+            onChange={(e) => {
+              setKeepOriginalsState(e.target.checked);
+              setKeepOriginals(e.target.checked);
+            }}
+            className="h-5 w-5 accent-indigo-600"
+          />
+        </label>
+
+        <div className="mt-3 rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-600">
+          <p>
+            저장 공간:{" "}
+            <span className="font-semibold text-gray-800">
+              {storage?.usage != null ? formatBytes(storage.usage) : "알 수 없음"}
+            </span>
+            {storage?.quota != null && <span className="text-gray-400"> / 허용량 {formatBytes(storage.quota)}</span>}
+          </p>
+          <p className="mt-1">
+            데이터 보호:{" "}
+            <span className="font-semibold text-gray-800">
+              {storage?.persisted == null ? "지원 안 함" : storage.persisted ? "영구 저장됨" : "브라우저가 정리할 수 있음"}
+            </span>
+          </p>
+          {storage?.persisted === false && (
+            <button
+              onClick={() => void requestPersistentStorage().then(refreshStorage)}
+              className="mt-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-indigo-600 shadow-sm"
+            >
+              영구 저장 요청하기
+            </button>
+          )}
+        </div>
+      </section>
+
       {message && (
         <p
           className={`mb-6 rounded-xl px-3 py-2.5 text-xs font-medium ${
@@ -131,6 +182,14 @@ export default function Settings() {
           {message.text}
         </p>
       )}
+
+      <Link
+        to="/notice"
+        className="mb-6 flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3.5 text-sm font-semibold text-gray-800"
+      >
+        이용 안내 · 고지
+        <span className="text-gray-400">›</span>
+      </Link>
 
       <section>
         <h2 className="mb-1 text-sm font-bold text-red-500">위험 구역</h2>

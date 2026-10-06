@@ -8,6 +8,7 @@ import DayEditor from "./pages/DayEditor";
 import Expenses from "./pages/Expenses";
 import Settings from "./pages/Settings";
 import PhotoTrip from "./pages/PhotoTrip";
+import Notice from "./pages/Notice";
 
 const MapPage = lazy(() => import("./pages/MapPage"));
 const RoutePage = lazy(() => import("./pages/RoutePage"));
@@ -41,6 +42,7 @@ export default function App() {
           />
           <Route path="/trips/:tripId/expenses" element={<Expenses />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/notice" element={<Notice />} />
         </Routes>
       </div>
       <BottomNav />

@@ -19,6 +19,24 @@ export default function Home() {
     return { countryCount: countries.size, cityCount: cities.size };
   }, []);
 
+  // Photo stats in one pass (covers excluded).
+  const photoStats = useLiveQuery(async () => {
+    let total = 0;
+    let located = 0;
+    let first = Infinity;
+    let last = -Infinity;
+    await db.photos.each((p) => {
+      if (p.dayId === "__cover__") return;
+      total++;
+      if (p.lat != null && p.lng != null) located++;
+      if (p.takenAt != null) {
+        first = Math.min(first, p.takenAt);
+        last = Math.max(last, p.takenAt);
+      }
+    });
+    return { total, located, first: Number.isFinite(first) ? first : null, last: Number.isFinite(last) ? last : null };
+  }, []);
+
   const grouped = groupByYear(trips ?? []);
 
   return (
@@ -49,11 +67,21 @@ export default function Home() {
 
       {trips && <HeroCard trips={trips} />}
 
-      <div className="mb-6 mt-5 flex gap-3">
+      {trips && trips.length === 0 && <StartSteps />}
+
+      <div className="mt-5 flex gap-3">
         <StatCard label="방문 국가" value={stats?.countryCount ?? 0} />
         <StatCard label="방문 도시" value={stats?.cityCount ?? 0} />
         <StatCard label="여행 기록" value={trips?.length ?? 0} />
       </div>
+      {photoStats && photoStats.total > 0 && (
+        <div className="mt-2 flex gap-3">
+          <StatCard label="사진" value={`${photoStats.total}장`} small />
+          <StatCard label="위치 있음" value={`${photoStats.located}장`} small />
+          <StatCard label="촬영 기간" value={formatSpan(photoStats.first, photoStats.last)} small />
+        </div>
+      )}
+      <div className="mb-6" />
 
       {Object.entries(grouped)
         .sort((a, b) => Number(b[0]) - Number(a[0]))
@@ -92,7 +120,10 @@ export default function Home() {
         ))}
 
       <p className="mt-10 pb-2 text-center text-[11px] text-gray-300">
-        Made by Seo Taeseong, 2026
+        Made by Seo Taeseong, 2026 ·{" "}
+        <Link to="/notice" className="underline underline-offset-2">
+          이용 안내 · 고지
+        </Link>
       </p>
     </div>
   );
@@ -137,11 +168,11 @@ function HeroCard({ trips }: { trips: Trip[] }) {
 
   return (
     <HeroShell
-      to="/trips/new"
+      to="/trips/from-photos"
       eyebrow="TRAVEL JOURNAL"
       title="여행은 끝나도, 기억은 남아요"
       subtitle="사진과 글, 그날의 지출까지. 흩어지는 순간을 하나씩 모아보세요."
-      cta="+ 첫 여행 시작하기"
+      cta="📷 사진으로 시작하기"
       emoji="🧳"
     />
   );
@@ -196,11 +227,63 @@ function HeroShell({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  label,
+  value,
+  small,
+}: {
+  label: string;
+  value: number | string;
+  small?: boolean;
+}) {
   return (
-    <div className="flex-1 rounded-2xl bg-gray-50 px-3 py-3 text-center">
-      <p className="text-lg font-bold text-gray-900">{value}</p>
+    <div className={`flex-1 rounded-2xl bg-gray-50 px-3 text-center ${small ? "py-2.5" : "py-3"}`}>
+      <p className={`font-bold text-gray-900 ${small ? "text-sm" : "text-lg"}`}>{value}</p>
       <p className="text-[11px] text-gray-500">{label}</p>
+    </div>
+  );
+}
+
+/** "2026.07 – 2026.09" style range; one month collapses to a single value. */
+function formatSpan(first: number | null, last: number | null): string {
+  if (first == null || last == null) return "—";
+  const fmt = (ms: number) => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const a = fmt(first);
+  const b = fmt(last);
+  return a === b ? a : `${a} – ${b}`;
+}
+
+/** First-run guide: the three steps from photos to a shareable trip. */
+function StartSteps() {
+  const steps = [
+    { n: "01", title: "사진 고르기", desc: "여행 사진을 한꺼번에 골라요" },
+    { n: "02", title: "자동 정리", desc: "촬영일·장소로 Day가 만들어져요" },
+    { n: "03", title: "동선 보기", desc: "지도에서 재생하고 영상으로 남겨요" },
+  ];
+  return (
+    <div className="mt-5 rounded-3xl bg-gray-50 p-4">
+      <ol className="flex flex-col gap-3">
+        {steps.map((step) => (
+          <li key={step.n} className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black tracking-wider text-indigo-600 shadow-sm">
+              {step.n}
+            </span>
+            <span>
+              <span className="block text-sm font-bold text-gray-800">{step.title}</span>
+              <span className="block text-xs text-gray-500">{step.desc}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-center text-[11px] text-gray-400">
+        사진은 내 기기에서만 처리돼요 ·{" "}
+        <Link to="/trips/new" className="font-medium text-indigo-500 underline underline-offset-2">
+          직접 입력해서 만들기
+        </Link>
+      </p>
     </div>
   );
 }

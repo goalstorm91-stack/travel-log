@@ -174,16 +174,20 @@ export async function generateTripShareCard(
   });
 }
 
-export async function shareTripCard(trip: Trip, blob: Blob): Promise<"shared" | "downloaded"> {
-  const file = new File([blob], `${trip.title}.png`, { type: "image/png" });
+/**
+ * Hands a file to the OS share sheet when the browser can share files,
+ * otherwise saves it as a download.
+ */
+export async function shareBlob(
+  blob: Blob,
+  filename: string,
+  opts: { title: string; text?: string },
+): Promise<"shared" | "downloaded"> {
+  const file = new File([blob], filename, { type: blob.type });
 
   if (navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({
-        files: [file],
-        title: trip.title,
-        text: `${trip.title} · ${getCountryLabel(trip.countryName)} ${trip.city}`,
-      });
+      await navigator.share({ files: [file], title: opts.title, text: opts.text });
       return "shared";
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return "shared";
@@ -194,10 +198,17 @@ export async function shareTripCard(trip: Trip, blob: Blob): Promise<"shared" | 
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${trip.title}.png`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
   return "downloaded";
+}
+
+export function shareTripCard(trip: Trip, blob: Blob): Promise<"shared" | "downloaded"> {
+  return shareBlob(blob, `${trip.title}.png`, {
+    title: trip.title,
+    text: `${trip.title} · ${getCountryLabel(trip.countryName)} ${trip.city}`,
+  });
 }

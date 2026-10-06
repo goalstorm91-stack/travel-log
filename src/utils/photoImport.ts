@@ -4,6 +4,8 @@ import type { DayEntry } from "../types";
 import { readPhotoMeta, toISODate } from "./exif";
 import { findNearestCity, type NearestCity } from "./geocode";
 import { renumberDays } from "./days";
+import { prepareImageForStorage } from "./imageStore";
+import { requestPersistentStorage } from "./storage";
 
 export interface AnalyzedPhoto {
   file: File;
@@ -73,17 +75,35 @@ export function groupByDate(photos: AnalyzedPhoto[]): Map<string, AnalyzedPhoto[
 /**
  * Stores photos (with their capture time and GPS) into a trip, creating a Day
  * per date, filling each new Day's place from its photos, and renumbering.
+ * Photos are converted/shrunk first (see prepareImageForStorage); ones that
+ * can't be converted are skipped and counted in `failed`.
  * Returns the first stored photo (chronologically) for cover selection.
  */
 export async function savePhotosToTrip(
   tripId: string,
   photos: AnalyzedPhoto[],
-): Promise<{ firstPhoto?: { id: string; blob: Blob } }> {
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ firstPhoto?: { id: string; blob: Blob }; saved: number; failed: number }> {
+  void requestPersistentStorage(); // keep the browser from evicting the photos we are about to store
   const existingDays = await db.days.where("tripId").equals(tripId).toArray();
   const byDate = new Map(existingDays.map((d) => [d.date, d]));
   let firstPhoto: { id: string; blob: Blob } | undefined;
+  let saved = 0;
+  let failed = 0;
+  let done = 0;
 
   for (const [date, dayPhotos] of groupByDate(photos)) {
+    const ready: { p: AnalyzedPhoto; blob: Blob }[] = [];
+    for (const p of dayPhotos) {
+      try {
+        ready.push({ p, blob: await prepareImageForStorage(p.file) });
+      } catch {
+        failed++;
+      }
+      onProgress?.(++done, photos.length);
+    }
+    if (ready.length === 0) continue; // don't create an empty Day
+
     let day = byDate.get(date);
     if (!day) {
       const now = Date.now();
@@ -100,24 +120,25 @@ export async function savePhotosToTrip(
       byDate.set(date, day);
     }
 
-    for (const p of dayPhotos) {
+    for (const { p, blob } of ready) {
       const id = uuid();
       await db.photos.add({
         id,
         tripId,
         dayId: day.id,
-        blob: p.file,
+        blob,
         createdAt: Date.now(),
         takenAt: p.time,
         lat: p.lat,
         lng: p.lng,
       });
       day.photoIds.push(id);
-      firstPhoto ??= { id, blob: p.file };
+      saved++;
+      firstPhoto ??= { id, blob };
     }
 
     if (!day.locationName) {
-      const place = dominantPlace(dayPhotos);
+      const place = dominantPlace(ready.map((r) => r.p));
       if (place) day.locationName = place.label;
     }
     day.updatedAt = Date.now();
@@ -125,7 +146,7 @@ export async function savePhotosToTrip(
   }
 
   await renumberDays(tripId);
-  return { firstPhoto };
+  return { firstPhoto, saved, failed };
 }
 
 /** Downscaled JPEG copy for covers; falls back to the original if it can't be decoded. */

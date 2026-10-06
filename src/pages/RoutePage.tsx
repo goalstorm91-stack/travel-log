@@ -7,17 +7,18 @@ import { formatDateKR } from "../utils/format";
 import { dayColor } from "../utils/colors";
 import {
   buildStops,
-  easeInOut,
-  lerpStops,
+  playbackFrame,
   routeDistanceKm,
+  segmentMs,
   type RoutePhoto,
   type Stop,
 } from "../utils/route";
 import PhotoImg from "../components/PhotoImg";
+import PhotoLightbox from "../components/PhotoLightbox";
+import RouteVideoDialog from "../components/RouteVideoDialog";
 import RouteMap from "../components/RouteMap";
 import TripTabs from "../components/TripTabs";
-
-const DWELL = 0.35; // share of each segment spent resting on a stop before moving on
+import UnlocatedPhotos from "../components/UnlocatedPhotos";
 
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -51,6 +52,9 @@ function RouteView({ tripId }: { tripId: string }) {
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [follow, setFollow] = useState(false);
+  const [lightbox, setLightbox] = useState<number | null>(null);
+  const [pick, setPick] = useState<{ ids: string[] } | null>(null);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [scan, setScan] = useState<{ done: number; total: number } | null>(null);
   const scanningRef = useRef(false);
   const elapsedRef = useRef(0);
@@ -109,7 +113,7 @@ function RouteView({ tripId }: { tripId: string }) {
   );
 
   const n = stops.length;
-  const segMs = n > 1 ? Math.min(1800, Math.max(500, Math.round(16000 / (n - 1)))) : 0;
+  const segMs = segmentMs(n);
   const total = Math.max(0, n - 1) * segMs;
 
   // Playback clock: wall-clock based so it runs the same regardless of frame rate.
@@ -128,13 +132,7 @@ function RouteView({ tripId }: { tripId: string }) {
     return () => clearInterval(id);
   }, [playing, total]);
 
-  const frame = useMemo(() => {
-    if (n < 2) return null;
-    const idx = Math.min(n - 2, Math.floor(elapsed / segMs));
-    const f = elapsed >= total ? 1 : (elapsed - idx * segMs) / segMs;
-    const u = f < DWELL ? 0 : easeInOut((f - DWELL) / (1 - DWELL));
-    return { idx, u, pos: lerpStops(stops[idx], stops[idx + 1], u) };
-  }, [n, elapsed, segMs, total, stops]);
+  const frame = useMemo(() => playbackFrame(stops, elapsed, segMs), [stops, elapsed, segMs]);
 
   const started = playing || elapsed > 0;
   const mover = started && frame ? frame.pos : null;
@@ -145,7 +143,7 @@ function RouteView({ tripId }: { tripId: string }) {
     return pts;
   }, [started, frame, stops]);
 
-  const selectedIdx = started && frame ? (frame.u >= 0.5 ? frame.idx + 1 : frame.idx) : selected;
+  const selectedIdx = started && frame ? frame.selectedIdx : selected;
   const selectedStop = selectedIdx != null ? stops[selectedIdx] : undefined;
 
   function resetPlayback() {
@@ -177,6 +175,27 @@ function RouteView({ tripId }: { tripId: string }) {
     if (i === 0) setElapsed(0);
   }
 
+  // Photos we've already read metadata for that have no GPS.
+  const unlocated = useMemo(() => {
+    const numberByDayId = new Map((days ?? []).map((d) => [d.id, d.dayNumber]));
+    return (photoRows ?? [])
+      .filter((p) => p.takenAt !== undefined && (p.lat == null || p.lng == null) && numberByDayId.has(p.dayId))
+      .map((p) => ({ id: p.id, dayNumber: numberByDayId.get(p.dayId)! }));
+  }, [photoRows, days]);
+
+  async function assignLocation(ids: string[], lat: number, lng: number, label?: string) {
+    const dayIds = new Set((photoRows ?? []).filter((p) => ids.includes(p.id)).map((p) => p.dayId));
+    await db.transaction("rw", db.photos, db.days, async () => {
+      for (const id of ids) await db.photos.update(id, { lat, lng });
+      if (label) {
+        for (const dayId of dayIds) {
+          const day = await db.days.get(dayId);
+          if (day && !day.locationName) await db.days.update(dayId, { locationName: label });
+        }
+      }
+    });
+  }
+
   if (!trip) return null;
 
   const totalPhotos = photoRows?.length ?? 0;
@@ -206,7 +225,7 @@ function RouteView({ tripId }: { tripId: string }) {
         </p>
       )}
 
-      {allStops.length === 0 && !scan ? (
+      {allStops.length === 0 && !scan && !pick ? (
         <div className="mx-4 mt-10 rounded-3xl bg-gray-50 p-6 text-center">
           <p className="text-3xl">🧭</p>
           <p className="mt-2 text-sm font-semibold text-gray-800">그려질 동선이 아직 없어요</p>
@@ -224,6 +243,14 @@ function RouteView({ tripId }: { tripId: string }) {
         </div>
       ) : (
         <>
+          {pick && (
+            <div className="mx-4 mt-4 flex items-center justify-between rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white">
+              <span>지도를 눌러 사진 {pick.ids.length}장의 위치를 정하세요</span>
+              <button onClick={() => setPick(null)} className="rounded-full bg-white/20 px-3 py-1">
+                취소
+              </button>
+            </div>
+          )}
           <div className="relative mt-4 overflow-hidden ring-1 ring-black/5">
             <RouteMap
               stops={stops}
@@ -232,6 +259,18 @@ function RouteView({ tripId }: { tripId: string }) {
               mover={mover}
               trail={trail}
               follow={follow}
+              pickMode={pick != null}
+              fallbackCenter={
+                trip.cityLat != null && trip.cityLng != null
+                  ? { lat: trip.cityLat, lng: trip.cityLng }
+                  : undefined
+              }
+              onPick={(lat, lng) => {
+                if (!pick) return;
+                const ids = pick.ids;
+                setPick(null);
+                void assignLocation(ids, lat, lng);
+              }}
             />
           </div>
 
@@ -274,6 +313,16 @@ function RouteView({ tripId }: { tripId: string }) {
             </div>
           )}
 
+          <div className="px-4 pt-3">
+            <button
+              onClick={() => setVideoOpen(true)}
+              disabled={n < 2}
+              className="w-full rounded-full border border-indigo-200 py-2.5 text-sm font-semibold text-indigo-600 disabled:border-gray-200 disabled:text-gray-300"
+            >
+              🎬 동선 영상 만들기
+            </button>
+          </div>
+
           <div className="flex gap-3 px-4 pt-3">
             <Stat label="위치 있는 사진" value={`${geoPhotos.length}/${totalPhotos}`} />
             <Stat label="정차 지점" value={`${n}곳`} />
@@ -302,13 +351,21 @@ function RouteView({ tripId }: { tripId: string }) {
                   </p>
                 )}
                 <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
-                  {selectedStop.photoIds.slice(0, 8).map((id) => (
-                    <PhotoImg key={id} photoId={id} className="h-20 w-20 shrink-0 rounded-xl" />
+                  {selectedStop.photoIds.slice(0, 8).map((id, i) => (
+                    <PhotoImg
+                      key={id}
+                      photoId={id}
+                      className="h-20 w-20 shrink-0 cursor-zoom-in rounded-xl"
+                      onClick={() => setLightbox(i)}
+                    />
                   ))}
                   {selectedStop.photoIds.length > 8 && (
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-semibold text-gray-400">
+                    <button
+                      onClick={() => setLightbox(8)}
+                      className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-semibold text-gray-400"
+                    >
                       +{selectedStop.photoIds.length - 8}
-                    </div>
+                    </button>
                   )}
                 </div>
               </>
@@ -319,6 +376,34 @@ function RouteView({ tripId }: { tripId: string }) {
             )}
           </div>
         </>
+      )}
+
+      {unlocated.length > 0 && !pick && (
+        <UnlocatedPhotos
+          photos={unlocated}
+          trip={trip}
+          onAssign={assignLocation}
+          onPickOnMap={(ids) => setPick({ ids })}
+        />
+      )}
+
+      {videoOpen && (
+        <RouteVideoDialog
+          trip={trip}
+          stops={stops}
+          days={days ?? []}
+          dayFilter={dayFilter}
+          onClose={() => setVideoOpen(false)}
+        />
+      )}
+
+      {lightbox != null && selectedStop && (
+        <PhotoLightbox
+          photoIds={selectedStop.photoIds}
+          index={lightbox}
+          onClose={() => setLightbox(null)}
+          onIndexChange={setLightbox}
+        />
       )}
     </div>
   );

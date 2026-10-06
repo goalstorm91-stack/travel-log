@@ -24,6 +24,7 @@ export default function PhotoTrip() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>("pick");
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [saveProgress, setSaveProgress] = useState<{ done: number; total: number } | null>(null);
   const [photos, setPhotos] = useState<AnalyzedPhoto[]>([]);
   const [error, setError] = useState("");
 
@@ -105,7 +106,9 @@ export default function PhotoTrip() {
       };
       await db.trips.add(trip);
 
-      const { firstPhoto } = await savePhotosToTrip(trip.id, photos);
+      const { firstPhoto, failed } = await savePhotosToTrip(trip.id, photos, (done, total) =>
+        setSaveProgress({ done, total }),
+      );
       if (firstPhoto) {
         const coverId = uuid();
         await db.photos.add({
@@ -117,7 +120,9 @@ export default function PhotoTrip() {
         });
         await db.trips.update(trip.id, { coverPhotoId: coverId });
       }
-      navigate(`/trips/${trip.id}`);
+      navigate(`/trips/${trip.id}`, {
+        state: failed > 0 ? { notice: `사진 ${failed}장은 변환하지 못해 건너뛰었어요.` } : undefined,
+      });
     } catch {
       setError("여행을 만드는 중 문제가 생겼어요. 다시 시도해 주세요.");
       setPhase("review");
@@ -268,7 +273,11 @@ export default function PhotoTrip() {
             disabled={phase === "saving"}
             className="rounded-full bg-indigo-600 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {phase === "saving" ? "만드는 중..." : "여행 만들기"}
+            {phase === "saving"
+              ? saveProgress
+                ? `사진 저장 중... ${saveProgress.done}/${saveProgress.total}`
+                : "만드는 중..."
+              : "여행 만들기"}
           </button>
           <button
             onClick={() => {

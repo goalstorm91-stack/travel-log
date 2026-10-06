@@ -66,6 +66,8 @@ export default defineConfig({
       workbox: {
         // mjs: the MapLibre worker files, so the map can still start offline
         globPatterns: ['**/*.{js,mjs,css,html,svg,png}'],
+        // the HEIC converter (1.3MB) is only needed when importing HEIC photos online
+        globIgnores: ['**/heic2any-*.js'],
       },
     }),
   ],

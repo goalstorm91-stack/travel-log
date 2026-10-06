@@ -73,3 +73,34 @@ export function lerpStops(a: Stop, b: Stop, u: number): { lat: number; lng: numb
 export function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
+
+/** Share of each playback segment spent resting on a stop before moving on. */
+export const DWELL = 0.35;
+
+/** Time per stop-to-stop segment so a whole route plays in roughly `targetMs`. */
+export function segmentMs(stopCount: number, targetMs = 16000): number {
+  return stopCount > 1 ? Math.min(1800, Math.max(500, Math.round(targetMs / (stopCount - 1)))) : 0;
+}
+
+export interface PlaybackFrame {
+  idx: number; // segment start stop
+  u: number; // 0..1 progress travelling to the next stop
+  pos: { lat: number; lng: number };
+  selectedIdx: number; // stop whose photos to show
+}
+
+/** Where the playback marker is `elapsed` ms into the route. Shared by the page and the video export. */
+export function playbackFrame(stops: Stop[], elapsed: number, segMs: number): PlaybackFrame | null {
+  const n = stops.length;
+  if (n < 2 || segMs <= 0) return null;
+  const total = (n - 1) * segMs;
+  const idx = Math.min(n - 2, Math.max(0, Math.floor(elapsed / segMs)));
+  const f = elapsed >= total ? 1 : Math.max(0, (elapsed - idx * segMs) / segMs);
+  const u = f < DWELL ? 0 : easeInOut((f - DWELL) / (1 - DWELL));
+  return {
+    idx,
+    u,
+    pos: lerpStops(stops[idx], stops[idx + 1], u),
+    selectedIdx: u >= 0.5 ? idx + 1 : idx,
+  };
+}

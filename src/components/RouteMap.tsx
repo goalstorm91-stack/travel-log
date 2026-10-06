@@ -45,6 +45,9 @@ export default function RouteMap({
   mover,
   trail,
   follow,
+  pickMode = false,
+  onPick,
+  fallbackCenter,
 }: {
   stops: Stop[];
   selectedIdx: number | null;
@@ -52,6 +55,11 @@ export default function RouteMap({
   mover: LatLng | null;
   trail: [number, number][] | null; // [lat, lng] pairs
   follow: boolean;
+  /** When true, the next map tap picks a location (crosshair cursor). */
+  pickMode?: boolean;
+  onPick?: (lat: number, lng: number) => void;
+  /** Where to look when there are no stops to fit (e.g. the trip's city). */
+  fallbackCenter?: LatLng;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
@@ -60,6 +68,8 @@ export default function RouteMap({
   const [failed, setFailed] = useState(false);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
 
   // Init the map once (the style is fetched first, so this is async), and add
   // the empty route/trail sources + layers that later effects fill in.
@@ -157,13 +167,16 @@ export default function RouteMap({
       features,
     });
 
-    if (stops.length === 1) {
+    if (stops.length === 0) {
+      if (fallbackCenter) map.jumpTo({ center: [fallbackCenter.lng, fallbackCenter.lat], zoom: 9 });
+    } else if (stops.length === 1) {
       map.jumpTo({ center: [stops[0].lng, stops[0].lat], zoom: 13 });
     } else if (stops.length > 1) {
       const bounds = new LngLatBounds();
       stops.forEach((s) => bounds.extend([s.lng, s.lat]));
       map.fitBounds(bounds, { padding: 44, maxZoom: 14, animate: false });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, stops]);
 
   // Numbered stop markers (restyled when the selection changes).
@@ -183,6 +196,21 @@ export default function RouteMap({
     });
     return () => markers.forEach((m) => m.remove());
   }, [ready, stops, selectedIdx]);
+
+  // "Pick on map" mode: a tap anywhere on the basemap reports its coordinates.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !pickMode) return;
+    const canvas = map.getCanvas();
+    canvas.style.cursor = "crosshair";
+    const onClick = (e: { lngLat: { lat: number; lng: number } }) =>
+      onPickRef.current?.(e.lngLat.lat, e.lngLat.lng);
+    map.on("click", onClick);
+    return () => {
+      map.off("click", onClick);
+      canvas.style.cursor = "";
+    };
+  }, [ready, pickMode]);
 
   // Playback marker.
   useEffect(() => {
