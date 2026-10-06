@@ -117,10 +117,7 @@ export default function TripDetail() {
 
   return (
     <div className="pb-4">
-      <div
-        className="relative h-48 w-full bg-gray-100"
-        onClick={() => coverInputRef.current?.click()}
-      >
+      <div className="relative h-48 w-full bg-gray-100">
         {trip.coverPhotoId ? (
           <PhotoImg photoId={trip.coverPhotoId} className="h-full w-full" />
         ) : (
@@ -146,26 +143,31 @@ export default function TripDetail() {
         </div>
         <Link
           to="/"
+          aria-label="홈으로"
           className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white"
         >
           ‹
         </Link>
+        {/* Changing the cover is an explicit action: making the whole header a file-picker
+            trigger fired it for every tap that reached it (including the back link). */}
+        <button
+          onClick={() => coverInputRef.current?.click()}
+          className="absolute bottom-3 right-3 rounded-full bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white"
+        >
+          📷 표지 변경
+        </button>
         <div className="absolute right-3 top-3 flex gap-2">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleShare();
-            }}
+            onClick={handleShare}
+            aria-label="공유"
             disabled={sharing}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white disabled:opacity-50"
           >
             {sharing ? "…" : "🔗"}
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteTrip();
-            }}
+            onClick={handleDeleteTrip}
+            aria-label="여행 삭제"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white"
           >
             🗑
