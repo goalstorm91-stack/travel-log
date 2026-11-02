@@ -7,7 +7,7 @@ import { getCountryLabel } from "../data/countries";
 import { formatDateKR } from "../utils/format";
 import { analyzePhotos, attachPlaces, savePhotosToTrip } from "../utils/photoImport";
 import { prepareImageForStorage } from "../utils/imageStore";
-import { generateTripShareCard, shareTripCard } from "../utils/shareCard";
+import ShareDialog from "../components/ShareDialog";
 import PhotoImg from "../components/PhotoImg";
 import PhotoCollage from "../components/PhotoCollage";
 import TripTabs from "../components/TripTabs";
@@ -18,8 +18,7 @@ export default function TripDetail() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const autoOrganizeInputRef = useRef<HTMLInputElement>(null);
   const [organizing, setOrganizing] = useState<{ done: number; total: number; label: string } | null>(null);
-  const [sharing, setSharing] = useState(false);
-  const [shareMessage, setShareMessage] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
   const location = useLocation();
   const [organizeMessage, setOrganizeMessage] = useState(
     (location.state as { notice?: string } | null)?.notice ?? "",
@@ -86,25 +85,6 @@ export default function TripDetail() {
     e.target.value = "";
   }
 
-  async function handleShare() {
-    setSharing(true);
-    setShareMessage("");
-    try {
-      const dayCount = days?.length ?? 0;
-      const photoCount = (days ?? []).reduce((sum, d) => sum + d.photoIds.length, 0);
-      const coverBlob = trip!.coverPhotoId
-        ? (await db.photos.get(trip!.coverPhotoId))?.blob
-        : undefined;
-      const cardBlob = await generateTripShareCard(trip!, { dayCount, photoCount }, coverBlob);
-      const result = await shareTripCard(trip!, cardBlob);
-      setShareMessage(result === "shared" ? "공유했어요!" : "이미지를 저장했어요.");
-    } catch {
-      setShareMessage("공유 카드를 만들지 못했어요.");
-    } finally {
-      setSharing(false);
-    }
-  }
-
   async function handleDeleteTrip() {
     if (!confirm(`"${trip!.title}" 여행을 삭제할까요? 모든 기록과 사진이 사라집니다.`)) return;
     const dayIds = (await db.days.where("tripId").equals(trip!.id).primaryKeys()) as string[];
@@ -161,12 +141,11 @@ export default function TripDetail() {
             📷 표지
           </button>
           <button
-            onClick={handleShare}
+            onClick={() => setShareOpen(true)}
             aria-label="공유"
-            disabled={sharing}
-            className="flex h-10 items-center rounded-full bg-indigo-50 px-3.5 text-[13px] font-semibold text-indigo-600 disabled:opacity-50"
+            className="flex h-10 items-center rounded-full bg-indigo-50 px-3.5 text-[13px] font-semibold text-indigo-600"
           >
-            {sharing ? "만드는 중…" : "🔗 공유"}
+            🔗 공유
           </button>
           <button
             onClick={handleDeleteTrip}
@@ -178,11 +157,7 @@ export default function TripDetail() {
         </div>
       </div>
 
-      {shareMessage && (
-        <p className="bg-indigo-50 px-4 py-2 text-center text-xs font-medium text-indigo-600">
-          {shareMessage}
-        </p>
-      )}
+      {shareOpen && <ShareDialog trip={trip} days={days ?? []} onClose={() => setShareOpen(false)} />}
 
       <TripTabs tripId={trip.id} active="journal" />
 
