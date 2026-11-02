@@ -5,6 +5,7 @@ import type { DayEntry, Trip } from "../types";
 import { getCountryLabel } from "../data/countries";
 import { formatDateKR } from "../utils/format";
 import { generateTripShareCard, shareBlob } from "../utils/shareCard";
+import { sendKakaoCard } from "../utils/kakao";
 
 /** Re-encodes the PNG card as JPEG: smaller, and accepted by every chat app. */
 async function toJpeg(png: Blob): Promise<Blob> {
@@ -51,6 +52,7 @@ export default function ShareDialog({
   const [card, setCard] = useState<{ jpeg: Blob; url: string } | null>(null);
   const [failed, setFailed] = useState(false);
   const [note, setNote] = useState<Note>(null);
+  const [kakaoBusy, setKakaoBusy] = useState(false);
   const urlRef = useRef<string | null>(null);
 
   const photoCount = useMemo(() => days.reduce((sum, d) => sum + d.photoIds.length, 0), [days]);
@@ -79,6 +81,29 @@ export default function ShareDialog({
     // The card is built once per open; later edits show up the next time it opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function shareKakao() {
+    if (!card) return;
+    setKakaoBusy(true);
+    setNote(null);
+    try {
+      await sendKakaoCard({
+        title: `${trip.emoji} ${trip.title}`,
+        description: `${getCountryLabel(trip.countryName)} ${trip.city} · ${formatDateKR(trip.startDate)} – ${formatDateKR(trip.endDate)}\n기록 ${days.length}일 · 사진 ${photoCount}장`,
+        image: card.jpeg,
+      });
+    } catch (err) {
+      const msg = String((err as { msg?: string; message?: string })?.msg ?? (err as Error)?.message ?? "");
+      setNote({
+        kind: "info",
+        text: /domain mismatched/i.test(msg)
+          ? `이 주소(${location.origin})가 카카오 개발자 사이트의 Web 도메인에 등록돼 있지 않아요. 등록 후 다시 시도해 주세요.`
+          : "카카오톡 카드를 보내지 못했어요. 인터넷 연결을 확인하거나, 아래 '카카오톡 · 다른 앱으로 보내기'를 써 주세요.",
+      });
+    } finally {
+      setKakaoBusy(false);
+    }
+  }
 
   async function shareImage() {
     if (!card) return;
@@ -156,9 +181,20 @@ export default function ShareDialog({
 
         <div className="mt-4 flex flex-col gap-2">
           <button
+            onClick={() => void shareKakao()}
+            disabled={!card || kakaoBusy}
+            className={`${btn} bg-yellow-300 text-gray-900`}
+          >
+            <span className="text-lg">💛</span>
+            <span className="flex-1">
+              {kakaoBusy ? "카카오톡 여는 중…" : "카카오톡으로 카드 보내기"}
+              <span className="block text-[11px] font-normal text-gray-700/70">제목·날짜·사진이 담긴 카드 메시지로 보내요</span>
+            </span>
+          </button>
+          <button
             onClick={() => void shareImage()}
             disabled={!card}
-            className={`${btn} bg-yellow-300 text-gray-900`}
+            className={`${btn} bg-amber-50 text-gray-800`}
           >
             <span className="text-lg">💬</span>
             <span className="flex-1">
