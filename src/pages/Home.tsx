@@ -5,6 +5,7 @@ import { getCountryLabel } from "../data/countries";
 import { toISODate } from "../utils/exif";
 import type { Trip } from "../types";
 import PhotoImg from "../components/PhotoImg";
+import InstallCard from "../components/InstallCard";
 
 export default function Home() {
   const trips = useLiveQuery(
@@ -68,6 +69,10 @@ export default function Home() {
       {trips && <HeroCard trips={trips} />}
 
       {trips && trips.length === 0 && <StartSteps />}
+
+      <div className="mt-5 empty:hidden">
+        <InstallCard />
+      </div>
 
       <div className="mt-5 flex gap-3">
         <StatCard label="방문 국가" value={stats?.countryCount ?? 0} />

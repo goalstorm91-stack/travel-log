@@ -1,3 +1,4 @@
+import InstallCard from "../components/InstallCard";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -91,6 +92,10 @@ export default function Settings() {
           <p className="text-[11px] text-gray-500">저장된 사진</p>
         </div>
       </div>
+
+      <section className="mb-6">
+        <InstallCard always />
+      </section>
 
       <section className="mb-6">
         <h2 className="mb-1 text-sm font-bold text-gray-800">데이터 백업</h2>

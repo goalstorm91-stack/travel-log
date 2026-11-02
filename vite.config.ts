@@ -48,10 +48,18 @@ export default defineConfig({
         short_name: '여행 기록',
         description: '사진, 글, 지출까지 담는 나만의 여행 일지',
         lang: 'ko',
+        id: '/',
         theme_color: '#4338ca',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'portrait',
+        categories: ['travel', 'lifestyle', 'photo'],
         start_url: '/',
+        shortcuts: [
+          { name: '새 여행 만들기', short_name: '새 여행', url: '/#/trips/new' },
+          { name: '사진으로 여행 만들기', short_name: '사진으로', url: '/#/trips/from-photos' },
+          { name: '내 지도 보기', short_name: '지도', url: '/#/map' },
+        ],
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
