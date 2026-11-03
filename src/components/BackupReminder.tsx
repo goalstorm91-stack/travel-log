@@ -45,7 +45,7 @@ export default function BackupReminder() {
         <button
           onClick={() => void backupNow()}
           disabled={busy}
-          className="rounded-full bg-amber-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
+          className="h-11 rounded-full bg-amber-500 px-5 text-xs font-bold text-white disabled:opacity-60"
         >
           {busy ? (progress!.total > 0 ? `사진 담는 중 ${progress!.done}/${progress!.total}` : "준비 중…") : "지금 백업하기"}
         </button>
@@ -55,12 +55,12 @@ export default function BackupReminder() {
               snoozeReminder();
               setTick((t) => t + 1);
             }}
-            className="px-2 py-2 text-xs font-medium text-amber-700/70"
+            className="h-11 px-3 text-xs font-medium text-amber-700/70"
           >
             나중에
           </button>
         )}
-        <Link to="/settings" className="ml-auto text-[11px] text-amber-700/70 underline underline-offset-2">
+        <Link to="/settings" className="ml-auto inline-flex h-11 items-center text-[11px] text-amber-700/70 underline underline-offset-2">
           설정에서 보기
         </Link>
       </div>

@@ -134,7 +134,8 @@ export default function PhotoTrip() {
       <div className="mb-5 flex items-center gap-3">
         <Link
           to="/trips/new"
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-600"
+          aria-label="이전 화면으로"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-600"
         >
           ‹
         </Link>

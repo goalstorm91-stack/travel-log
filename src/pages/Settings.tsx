@@ -96,7 +96,8 @@ export default function Settings() {
       <div className="mb-5 flex items-center gap-3">
         <Link
           to="/"
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-600"
+          aria-label="이전 화면으로"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-600"
         >
           ‹
         </Link>
@@ -225,7 +226,7 @@ export default function Settings() {
           {storage?.persisted === false && (
             <button
               onClick={() => void requestPersistentStorage().then(refreshStorage)}
-              className="mt-2 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-indigo-600 shadow-sm"
+              className="mt-2 h-11 rounded-full bg-white px-4 text-xs font-semibold text-indigo-600 shadow-sm"
             >
               영구 저장 요청하기
             </button>

@@ -50,7 +50,8 @@ export default function Expenses() {
       <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-4">
         <Link
           to={`/trips/${trip.id}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-600"
+          aria-label="이전 화면으로"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-600"
         >
           ‹
         </Link>
@@ -198,7 +199,8 @@ export default function Expenses() {
                 </span>
                 <button
                   onClick={() => handleDelete(exp.id)}
-                  className="ml-1 text-xs text-gray-300"
+                  aria-label="지출 삭제"
+                  className="-mr-2 flex h-11 w-11 items-center justify-center text-sm text-gray-400"
                 >
                   ✕
                 </button>

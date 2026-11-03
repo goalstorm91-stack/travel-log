@@ -43,6 +43,7 @@ export default function DayEditor() {
   // Photo changes are staged until "저장하기": new photos are stored right away (they have to
   // be, to show a preview) but removed again if the edit is abandoned, and removed photos are
   // only deleted for real on save.
+  const [selected, setSelected] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [removed, setRemoved] = useState<string[]>([]);
   const pending = useRef({ added, committed: false });
@@ -56,6 +57,8 @@ export default function DayEditor() {
     },
     [],
   );
+
+  const selectedIndex = selected ? photoIds.indexOf(selected) : -1;
 
   const dirty =
     added.length > 0 ||
@@ -129,6 +132,7 @@ export default function DayEditor() {
   }
 
   async function removePhoto(id: string) {
+    setSelected(null);
     setPhotoIds((prev) => prev.filter((p) => p !== id));
     if (added.includes(id)) {
       // never part of the saved day, so nothing to keep
@@ -238,35 +242,32 @@ export default function DayEditor() {
           />
         </Field>
 
-        <Field label="사진">
+        {/* a <div>, not a <Field> label: a label would forward stray taps to its first button */}
+        <div>
+          <span className="mb-1.5 block text-xs font-semibold text-gray-500">사진</span>
           <div className="flex flex-wrap gap-2">
-            {photoIds.map((id, i) => (
-              <div key={id} className="relative h-20 w-20">
-                <PhotoImg photoId={id} size="thumb" className="h-20 w-20 rounded-lg" />
+            {photoIds.map((id, i) => {
+              const on = selected === id;
+              return (
                 <button
-                  onClick={() => removePhoto(id)}
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-[10px] text-white"
+                  type="button"
+                  key={id}
+                  onClick={() => setSelected(on ? null : id)}
+                  aria-pressed={on}
+                  aria-label={`사진 ${i + 1}번 선택`}
+                  className={`relative h-20 w-20 rounded-lg ${on ? "ring-2 ring-indigo-500 ring-offset-2" : ""}`}
                 >
-                  ✕
+                  <PhotoImg photoId={id} size="thumb" className="h-20 w-20 rounded-lg" />
+                  <span className="absolute left-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-black/55 px-1 text-[10px] font-bold text-white">
+                    {i + 1}
+                  </span>
                 </button>
-                <div className="absolute -bottom-1.5 left-1/2 flex -translate-x-1/2 gap-0.5">
-                  <button
-                    onClick={() => movePhoto(i, -1)}
-                    className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] shadow"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() => movePhoto(i, 1)}
-                    className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] shadow"
-                  >
-                    ›
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
+              aria-label="사진 추가"
               className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-gray-300 text-2xl text-gray-300"
             >
               +
@@ -280,7 +281,39 @@ export default function DayEditor() {
               onChange={handleFiles}
             />
           </div>
-        </Field>
+
+          {selectedIndex >= 0 ? (
+            <div className="mt-3 flex gap-2" role="group" aria-label={`사진 ${selectedIndex + 1}번 편집`}>
+              <button
+                type="button"
+                onClick={() => movePhoto(selectedIndex, -1)}
+                disabled={selectedIndex === 0}
+                className="flex h-11 flex-1 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-700 disabled:opacity-35"
+              >
+                ← 앞으로
+              </button>
+              <button
+                type="button"
+                onClick={() => movePhoto(selectedIndex, 1)}
+                disabled={selectedIndex === photoIds.length - 1}
+                className="flex h-11 flex-1 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-700 disabled:opacity-35"
+              >
+                뒤로 →
+              </button>
+              <button
+                type="button"
+                onClick={() => void removePhoto(selected!)}
+                className="flex h-11 flex-1 items-center justify-center rounded-full bg-red-50 text-sm font-semibold text-red-500"
+              >
+                🗑 삭제
+              </button>
+            </div>
+          ) : (
+            photoIds.length > 0 && (
+              <p className="mt-2 text-[11px] text-gray-400">사진을 누르면 순서를 바꾸거나 삭제할 수 있어요.</p>
+            )
+          )}
+        </div>
 
         <Field label="위치 (선택)">
           <input

@@ -55,7 +55,7 @@ export default function InstallCard({ always = false }: { always?: boolean }) {
         <button
           onClick={dismiss}
           aria-label="안내 닫기"
-          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-xs text-indigo-300"
+          className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-full text-xs text-indigo-300"
         >
           ✕
         </button>

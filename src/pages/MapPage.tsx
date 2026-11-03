@@ -102,7 +102,7 @@ export default function MapPage() {
         {focused && (
           <button
             onClick={resetView}
-            className="absolute right-2 top-2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-gray-600 shadow"
+            className="absolute right-2 top-2 h-11 rounded-full bg-white/90 px-4 text-xs font-semibold text-gray-600 shadow"
           >
             전체 지도
           </button>
@@ -113,7 +113,7 @@ export default function MapPage() {
         {activeTrip ? (
           <Link
             to={`/trips/${activeTrip.id}`}
-            className="rounded-full bg-indigo-50 px-3 py-1 font-semibold text-indigo-600"
+            className="inline-flex min-h-11 items-center rounded-full bg-indigo-50 px-4 py-1 font-semibold text-indigo-600"
           >
             📍 {getCountryLabel(activeTrip.countryName)} {activeTrip.city} · {activeTrip.title} 보기
           </Link>
@@ -143,7 +143,7 @@ export default function MapPage() {
               >
                 <button
                   onClick={() => focusOnCountry(code, ts!)}
-                  className="flex items-center gap-2 text-sm font-medium text-gray-800"
+                  className="flex min-h-11 items-center gap-2 text-sm font-medium text-gray-800"
                 >
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -156,7 +156,7 @@ export default function MapPage() {
                     <Link
                       key={t.id}
                       to={`/trips/${t.id}`}
-                      className="rounded-full bg-white px-2.5 py-1 text-[11px] text-gray-500 shadow-sm"
+                      className="inline-flex min-h-11 items-center rounded-full bg-white px-3.5 text-xs text-gray-500 shadow-sm"
                     >
                       {t.city}
                     </Link>

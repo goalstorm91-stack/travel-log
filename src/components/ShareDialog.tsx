@@ -166,7 +166,7 @@ export default function ShareDialog({
       >
         <div className="flex items-center justify-between">
           <p className="text-base font-bold text-gray-900">🔗 여행 공유하기</p>
-          <button onClick={onClose} aria-label="닫기" className="h-9 w-9 rounded-full bg-gray-100 text-gray-500">
+          <button onClick={onClose} aria-label="닫기" className="h-11 w-11 rounded-full bg-gray-100 text-gray-500">
             ✕
           </button>
         </div>

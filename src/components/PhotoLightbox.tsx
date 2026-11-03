@@ -66,7 +66,7 @@ export default function PhotoLightbox({
           e.stopPropagation();
           onClose();
         }}
-        className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-lg text-white"
+        className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-lg text-white"
       >
         ✕
       </button>
@@ -79,7 +79,7 @@ export default function PhotoLightbox({
               e.stopPropagation();
               go(-1);
             }}
-            className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-xl text-white"
+            className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-xl text-white"
           >
             ‹
           </button>
@@ -89,7 +89,7 @@ export default function PhotoLightbox({
               e.stopPropagation();
               go(1);
             }}
-            className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-xl text-white"
+            className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-xl text-white"
           >
             ›
           </button>

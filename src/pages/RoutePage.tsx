@@ -207,7 +207,8 @@ function RouteView({ tripId }: { tripId: string }) {
       <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-4">
         <Link
           to={`/trips/${trip.id}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-600"
+          aria-label="이전 화면으로"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-600"
         >
           ‹
         </Link>
@@ -292,7 +293,7 @@ function RouteView({ tripId }: { tripId: string }) {
             )}
             <button
               onClick={() => setFollow((v) => !v)}
-              className={`rounded-full px-4 py-2.5 text-xs font-semibold ${
+              className={`h-11 rounded-full px-4 text-xs font-semibold ${
                 follow ? "bg-indigo-100 text-indigo-600" : "border border-gray-200 text-gray-500"
               }`}
             >

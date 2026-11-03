@@ -25,7 +25,7 @@ const LIBS: Lib[] = [
 
 function A({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="font-medium text-indigo-600 underline underline-offset-2">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="inline-block py-2 font-medium text-indigo-600 underline underline-offset-2">
       {children}
     </a>
   );
@@ -46,7 +46,8 @@ export default function Notice() {
       <div className="mb-6 flex items-center gap-3">
         <Link
           to="/settings"
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-600"
+          aria-label="이전 화면으로"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-600"
         >
           ‹
         </Link>

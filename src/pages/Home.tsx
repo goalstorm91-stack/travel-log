@@ -53,14 +53,14 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <Link
             to="/map"
-            className="rounded-full bg-gray-900 px-4 py-2 text-xs font-semibold text-white"
+            className="flex h-11 items-center rounded-full bg-gray-900 px-4 text-xs font-semibold text-white"
           >
             내 지도 보기
           </Link>
           <Link
             to="/settings"
             aria-label="설정"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-500"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-lg text-gray-500"
           >
             ⚙
           </Link>
@@ -131,7 +131,7 @@ export default function Home() {
         <p className="text-sm font-semibold tracking-wide text-gray-700">
           Made by Seo Taeseong, 2026
         </p>
-        <Link to="/notice" className="text-xs text-gray-400 underline underline-offset-2">
+        <Link to="/notice" className="inline-flex h-11 items-center text-xs text-gray-400 underline underline-offset-2">
           이용 안내 · 고지
         </Link>
       </footer>
