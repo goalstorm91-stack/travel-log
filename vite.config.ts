@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -34,12 +34,31 @@ function maplibreWorker(): Plugin {
   }
 }
 
+// The link-preview tags in index.html need the app's absolute address. Fill it in here
+// (rather than relying on Vite's own %VAR% replacement) so a stray trailing slash in
+// VITE_APP_URL can't produce "https://host//icon.png".
+function appUrlInHtml(): Plugin {
+  let url = ''
+  return {
+    name: 'app-url-in-html',
+    configResolved(config) {
+      const env = loadEnv(config.mode, config.envDir || process.cwd(), 'VITE_')
+      url = (env.VITE_APP_URL ?? '').trim().replace(/\/+$/, '')
+    },
+    transformIndexHtml: {
+      order: 'pre',
+      handler: (html) => html.replace(/%VITE_APP_URL%/g, url),
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     maplibreWorker(),
+    appUrlInHtml(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],

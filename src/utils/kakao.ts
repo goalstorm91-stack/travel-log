@@ -1,7 +1,9 @@
-// Kakao JavaScript key: a public key by design (it ships in every page that uses the
-// SDK). Requests are only accepted from the web domains registered for the app in
-// Kakao Developers (앱 > 플랫폼 > Web), so it can't be used from other sites.
-const KAKAO_JS_KEY = "804a76627e9bb501d9bd51a4fd444284";
+import { APP_URL, KAKAO_JS_KEY } from "../config";
+
+// The key is public by design (it ships in every page that uses the SDK). Requests are
+// only accepted from the JavaScript SDK domains registered for it in Kakao Developers
+// (앱 > 플랫폼 키 > JavaScript 키), so it can't be used from other sites.
+export const isKakaoConfigured = KAKAO_JS_KEY !== "";
 const SDK_URL = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js";
 
 interface KakaoSdk {
@@ -58,7 +60,7 @@ export async function sendKakaoCard(opts: {
   const file = new File([opts.image], "trip.jpg", { type: "image/jpeg" });
   const uploaded = await kakao.Share.uploadImage({ file: [file] });
   const imageUrl = uploaded.infos.original.url;
-  const link = { mobileWebUrl: location.origin, webUrl: location.origin };
+  const link = { mobileWebUrl: APP_URL, webUrl: APP_URL };
   kakao.Share.sendDefault({
     objectType: "feed",
     content: { title: opts.title, description: opts.description, imageUrl, link },

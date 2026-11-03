@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { APP_URL } from "../config";
 import { getInstallKind, promptInstall, subscribeInstall, type InstallKind } from "../utils/pwa";
 
 const DISMISS_KEY = "install-card-dismissed";
@@ -42,7 +43,7 @@ export default function InstallCard({ always = false }: { always?: boolean }) {
 
   async function copyAddress() {
     try {
-      await navigator.clipboard.writeText(location.origin);
+      await navigator.clipboard.writeText(APP_URL);
       setCopied(true);
     } catch {
       setCopied(false);

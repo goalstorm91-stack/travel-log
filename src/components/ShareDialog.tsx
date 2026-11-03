@@ -5,7 +5,8 @@ import type { DayEntry, Trip } from "../types";
 import { getCountryLabel } from "../data/countries";
 import { formatDateKR } from "../utils/format";
 import { generateTripShareCard, shareBlob } from "../utils/shareCard";
-import { sendKakaoCard } from "../utils/kakao";
+import { isKakaoConfigured, sendKakaoCard } from "../utils/kakao";
+import { APP_URL } from "../config";
 
 /** Re-encodes the PNG card as JPEG: smaller, and accepted by every chat app. */
 async function toJpeg(png: Blob): Promise<Blob> {
@@ -34,7 +35,7 @@ function buildShareText(trip: Trip, days: DayEntry[], photoCount: number): strin
     lines.push("");
     for (const d of highlights) lines.push(`Day ${d.dayNumber}  ${d.title}`);
   }
-  lines.push("", `나만의 여행 일지 · ${location.origin}`);
+  lines.push("", `나만의 여행 일지 · ${APP_URL}`);
   return lines.join("\n");
 }
 
@@ -180,17 +181,19 @@ export default function ShareDialog({
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
-          <button
-            onClick={() => void shareKakao()}
-            disabled={!card || kakaoBusy}
-            className={`${btn} bg-yellow-300 text-gray-900`}
-          >
-            <span className="text-lg">💛</span>
-            <span className="flex-1">
-              {kakaoBusy ? "카카오톡 여는 중…" : "카카오톡으로 카드 보내기"}
-              <span className="block text-[11px] font-normal text-gray-700/70">제목·날짜·사진이 담긴 카드 메시지로 보내요</span>
-            </span>
-          </button>
+          {isKakaoConfigured && (
+            <button
+              onClick={() => void shareKakao()}
+              disabled={!card || kakaoBusy}
+              className={`${btn} bg-yellow-300 text-gray-900`}
+            >
+              <span className="text-lg">💛</span>
+              <span className="flex-1">
+                {kakaoBusy ? "카카오톡 여는 중…" : "카카오톡으로 카드 보내기"}
+                <span className="block text-[11px] font-normal text-gray-700/70">제목·날짜·사진이 담긴 카드 메시지로 보내요</span>
+              </span>
+            </button>
+          )}
           <button
             onClick={() => void shareImage()}
             disabled={!card}
