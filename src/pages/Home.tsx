@@ -105,6 +105,7 @@ export default function Home() {
                   {trip.coverPhotoId ? (
                     <PhotoImg
                       photoId={trip.coverPhotoId}
+                      size="thumb"
                       className="h-full w-full"
                     />
                   ) : (
@@ -225,7 +226,7 @@ function HeroShell({
 
       <div className="relative shrink-0 rotate-3 rounded-md bg-white p-1.5 shadow-xl">
         {photoId ? (
-          <PhotoImg photoId={photoId} className="h-20 w-16 rounded-sm" />
+          <PhotoImg photoId={photoId} size="thumb" className="h-20 w-16 rounded-sm" />
         ) : (
           <div className="flex h-20 w-16 items-center justify-center rounded-sm bg-indigo-50 text-3xl">
             {emoji ?? "✈️"}

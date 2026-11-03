@@ -127,6 +127,7 @@ export default function UnlocatedPhotos({
                   >
                     <PhotoImg
                       photoId={p.id}
+                      size="thumb"
                       className={`h-16 w-16 rounded-xl ${on ? "ring-2 ring-indigo-500 ring-offset-1" : ""}`}
                     />
                     {on && (

@@ -26,6 +26,7 @@ export default function PhotoCollage({ photoIds }: { photoIds: string[] }) {
                   <PhotoImg
                     key={id}
                     photoId={id}
+                    size="thumb"
                     className="aspect-square w-1/2 cursor-zoom-in rounded-xl"
                     onClick={() => setOpen(ri * 3 + ci)}
                   />

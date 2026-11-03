@@ -242,7 +242,7 @@ export default function DayEditor() {
           <div className="flex flex-wrap gap-2">
             {photoIds.map((id, i) => (
               <div key={id} className="relative h-20 w-20">
-                <PhotoImg photoId={id} className="h-20 w-20 rounded-lg" />
+                <PhotoImg photoId={id} size="thumb" className="h-20 w-20 rounded-lg" />
                 <button
                   onClick={() => removePhoto(id)}
                   className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-[10px] text-white"

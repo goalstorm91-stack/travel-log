@@ -304,7 +304,9 @@ export async function applyBackup(b: ParsedBackup): Promise<BackupSummary> {
   });
   const trips = b.trips.map((t) => (t.coverPhotoId && !available.has(t.coverPhotoId) ? { ...t, coverPhotoId: undefined } : t));
 
-  await db.transaction("rw", db.trips, db.days, db.expenses, db.photos, async () => {
+  await db.transaction("rw", db.trips, db.days, db.expenses, db.photos, db.thumbs, async () => {
+    // a restored photo may differ from the one a thumbnail was made from: rebuild on demand
+    if (photos.length) await db.thumbs.bulkDelete(photos.map((p) => p.id));
     if (trips.length) await db.trips.bulkPut(trips);
     if (days.length) await db.days.bulkPut(days);
     if (b.expenses.length) await db.expenses.bulkPut(b.expenses);
@@ -337,10 +339,11 @@ export async function importBackup(
 }
 
 export async function clearAllData(): Promise<void> {
-  await db.transaction("rw", db.trips, db.days, db.expenses, db.photos, async () => {
+  await db.transaction("rw", db.trips, db.days, db.expenses, db.photos, db.thumbs, async () => {
     await db.trips.clear();
     await db.days.clear();
     await db.expenses.clear();
     await db.photos.clear();
+    await db.thumbs.clear();
   });
 }

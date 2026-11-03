@@ -355,6 +355,7 @@ function RouteView({ tripId }: { tripId: string }) {
                     <PhotoImg
                       key={id}
                       photoId={id}
+                      size="thumb"
                       className="h-20 w-20 shrink-0 cursor-zoom-in rounded-xl"
                       onClick={() => setLightbox(i)}
                     />

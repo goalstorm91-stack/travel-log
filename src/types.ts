@@ -65,3 +65,9 @@ export interface Expense {
   participants: string[]; // split equally among these people
   createdAt: number;
 }
+
+/** Small preview of a Photo (same id), kept apart so the full photo isn't loaded for grids. */
+export interface Thumb {
+  id: string;
+  blob: Blob;
+}
