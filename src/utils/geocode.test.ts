@@ -31,6 +31,20 @@ describe("findNearestCity", () => {
     expect(await findNearestCity(0, -140)).toBeUndefined();
   });
 
+  it("knows popular small Korean travel towns instead of naming a far bigger city", async () => {
+    // These used to resolve to Gangneung (58 km away) and Jecheon (22 km away).
+    expect((await findNearestCity(38.2161, 128.5956))?.label).toBe("속초");
+    expect((await findNearestCity(37.1795, 128.4651))?.label).toBe("영월");
+    expect((await findNearestCity(36.7456, 126.2978))?.label).toBe("태안");
+  });
+
+  it("finds those towns by their Korean name", async () => {
+    for (const [name, lat] of [["속초", 38.2], ["영월", 37.2], ["통영", 34.9], ["가평", 37.8]] as const) {
+      const coords = await findCityCoords(name, "South Korea");
+      expect(coords?.lat).toBeCloseTo(lat, 0);
+    }
+  });
+
   it("gives a Korean label for well-known cities", async () => {
     const place = await findNearestCity(37.5665, 126.978);
     expect(place?.label).toBe("서울");

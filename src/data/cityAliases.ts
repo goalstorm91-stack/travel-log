@@ -31,6 +31,18 @@ export const CITY_ALIASES: Record<string, { city: string; country: string }> = {
   전주: { city: "Jeonju", country: "South Korea" },
   여수: { city: "Yeosu", country: "South Korea" },
   강릉: { city: "Gangneung", country: "South Korea" },
+  속초: { city: "Sokcho", country: "South Korea" },
+  영월: { city: "Yeongwol", country: "South Korea" },
+  양양: { city: "Yangyang", country: "South Korea" },
+  평창: { city: "Pyeongchang", country: "South Korea" },
+  정선: { city: "Jeongseon", country: "South Korea" },
+  단양: { city: "Danyang", country: "South Korea" },
+  태안: { city: "Taean", country: "South Korea" },
+  가평: { city: "Gapyeong", country: "South Korea" },
+  거제: { city: "Geoje", country: "South Korea" },
+  통영: { city: "Tongyeong", country: "South Korea" },
+  남해: { city: "Namhae", country: "South Korea" },
+  담양: { city: "Damyang", country: "South Korea" },
 
   // China / Taiwan / Hong Kong / Macau
   베이징: { city: "Beijing", country: "China" },
