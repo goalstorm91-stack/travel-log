@@ -1,9 +1,10 @@
 import { Suspense, lazy } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
+import ErrorBoundary from "./components/ErrorBoundary";
 import UpdateBanner from "./components/UpdateBanner";
 import Home from "./pages/Home";
-import NewTrip from "./pages/NewTrip";
+import NewTrip, { EditTrip } from "./pages/NewTrip";
 import TripDetail from "./pages/TripDetail";
 import DayEditor from "./pages/DayEditor";
 import Expenses from "./pages/Expenses";
@@ -15,10 +16,13 @@ const MapPage = lazy(() => import("./pages/MapPage"));
 const RoutePage = lazy(() => import("./pages/RoutePage"));
 
 export default function App() {
+  const { pathname } = useLocation();
   return (
     <div className="app-shell">
       <UpdateBanner />
       <div className="no-scrollbar flex-1 overflow-y-auto pb-2">
+        {/* keyed by page so a crash clears as soon as someone navigates elsewhere */}
+        <ErrorBoundary key={pathname}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route
@@ -32,6 +36,7 @@ export default function App() {
           <Route path="/trips/new" element={<NewTrip />} />
           <Route path="/trips/from-photos" element={<PhotoTrip />} />
           <Route path="/trips/:tripId" element={<TripDetail />} />
+          <Route path="/trips/:tripId/edit" element={<EditTrip />} />
           <Route path="/trips/:tripId/days/new" element={<DayEditor />} />
           <Route path="/trips/:tripId/days/:dayId" element={<DayEditor />} />
           <Route
@@ -46,6 +51,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/notice" element={<Notice />} />
         </Routes>
+        </ErrorBoundary>
       </div>
       <BottomNav />
     </div>

@@ -125,32 +125,39 @@ export default function TripDetail() {
 
       {/* Actions live below the photo, where they're readable on any cover and can't be
           confused with the cover itself. Changing the cover is its own explicit button. */}
-      <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
         <Link
           to="/"
           aria-label="홈으로"
-          className="flex h-10 items-center gap-1 rounded-full bg-gray-100 px-4 text-sm font-semibold text-gray-700"
+          className="flex h-10 items-center gap-1 rounded-full bg-gray-100 px-3.5 text-sm font-semibold text-gray-700"
         >
           <span className="text-base leading-none">‹</span> 홈
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
           <button
             onClick={() => coverInputRef.current?.click()}
-            className="flex h-10 items-center rounded-full bg-gray-100 px-3.5 text-[13px] font-semibold text-gray-700"
+            className="flex h-10 items-center rounded-full bg-gray-100 px-2.5 text-[13px] font-semibold text-gray-700"
           >
             📷 표지
           </button>
+          <Link
+            to={`/trips/${trip.id}/edit`}
+            aria-label="여행 정보 수정"
+            className="flex h-10 items-center rounded-full bg-gray-100 px-2.5 text-[13px] font-semibold text-gray-700"
+          >
+            ✏️ 수정
+          </Link>
           <button
             onClick={() => setShareOpen(true)}
             aria-label="공유"
-            className="flex h-10 items-center rounded-full bg-indigo-50 px-3.5 text-[13px] font-semibold text-indigo-600"
+            className="flex h-10 items-center rounded-full bg-indigo-50 px-2.5 text-[13px] font-semibold text-indigo-600"
           >
             🔗 공유
           </button>
           <button
             onClick={handleDeleteTrip}
             aria-label="여행 삭제"
-            className="flex h-10 items-center rounded-full bg-red-50 px-3.5 text-[13px] font-semibold text-red-500"
+            className="flex h-10 items-center rounded-full bg-red-50 px-2.5 text-[13px] font-semibold text-red-500"
           >
             🗑 삭제
           </button>

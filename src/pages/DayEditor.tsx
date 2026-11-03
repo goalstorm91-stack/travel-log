@@ -7,6 +7,7 @@ import type { DayEntry } from "../types";
 import { readPhotoMeta } from "../utils/exif";
 import { prepareImageForStorage } from "../utils/imageStore";
 import PhotoImg from "../components/PhotoImg";
+import { useUnsavedGuard } from "../utils/useUnsavedGuard";
 
 export default function DayEditor() {
   const { tripId, dayId: routeDayId } = useParams<{
@@ -38,6 +39,39 @@ export default function DayEditor() {
   const [photoIds, setPhotoIds] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(isNew);
   const [error, setError] = useState("");
+
+  // Photo changes are staged until "저장하기": new photos are stored right away (they have to
+  // be, to show a preview) but removed again if the edit is abandoned, and removed photos are
+  // only deleted for real on save.
+  const [added, setAdded] = useState<string[]>([]);
+  const [removed, setRemoved] = useState<string[]>([]);
+  const pending = useRef({ added, committed: false });
+  useEffect(() => {
+    pending.current.added = added;
+  }, [added]);
+  useEffect(
+    () => () => {
+      const p = pending.current;
+      if (!p.committed && p.added.length > 0) void db.photos.bulkDelete(p.added);
+    },
+    [],
+  );
+
+  const dirty =
+    added.length > 0 ||
+    removed.length > 0 ||
+    (isNew
+      ? !!(title.trim() || locationName.trim() || text.trim() || quote.trim())
+      : !!existingDay &&
+        loaded &&
+        (date !== existingDay.date ||
+          dayNumber !== existingDay.dayNumber ||
+          title !== existingDay.title ||
+          locationName !== (existingDay.locationName ?? "") ||
+          text !== (existingDay.text ?? "") ||
+          quote !== (existingDay.quote ?? "") ||
+          photoIds.join() !== existingDay.photoIds.join()));
+  const guard = useUnsavedGuard(dirty);
 
   useEffect(() => {
     if (!isNew && existingDay && !loaded) {
@@ -89,13 +123,20 @@ export default function DayEditor() {
       newIds.push(id);
     }
     setPhotoIds((prev) => [...prev, ...newIds]);
+    setAdded((prev) => [...prev, ...newIds]);
     if (failedCount > 0) setError(`사진 ${failedCount}장은 변환하지 못해 건너뛰었어요.`);
     e.target.value = "";
   }
 
   async function removePhoto(id: string) {
-    await db.photos.delete(id);
     setPhotoIds((prev) => prev.filter((p) => p !== id));
+    if (added.includes(id)) {
+      // never part of the saved day, so nothing to keep
+      await db.photos.delete(id);
+      setAdded((prev) => prev.filter((p) => p !== id));
+    } else {
+      setRemoved((prev) => [...prev, id]);
+    }
   }
 
   function movePhoto(index: number, dir: -1 | 1) {
@@ -129,6 +170,9 @@ export default function DayEditor() {
       updatedAt: now,
     };
     await db.days.put(entry);
+    if (removed.length > 0) await db.photos.bulkDelete(removed);
+    pending.current.committed = true;
+    guard.leave();
     navigate(`/trips/${tripId}`);
   }
 
@@ -136,6 +180,8 @@ export default function DayEditor() {
     if (!confirm("이 하루 기록을 삭제할까요?")) return;
     await db.photos.where("dayId").equals(dayId).delete();
     await db.days.delete(dayId);
+    pending.current.committed = true;
+    guard.leave();
     navigate(`/trips/${tripId}`);
   }
 
