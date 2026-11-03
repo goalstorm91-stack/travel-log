@@ -6,6 +6,7 @@ import { getCountryLabel } from "../data/countries";
 import { formatDateKR } from "../utils/format";
 import type { Stop } from "../utils/route";
 import { shareBlob } from "../utils/shareCard";
+import { getVideoEndCard, setVideoEndCard } from "../utils/settings";
 import {
   exportRouteVideo,
   isRouteVideoSupported,
@@ -35,6 +36,7 @@ export default function RouteVideoDialog({
   const supported = isRouteVideoSupported();
   const [phase, setPhase] = useState<Phase>({ name: "intro" });
   const [shareNote, setShareNote] = useState("");
+  const [endCard, setEndCard] = useState(getVideoEndCard);
   const abortRef = useRef<AbortController | null>(null);
   const urlRef = useRef<string | null>(null);
 
@@ -88,6 +90,7 @@ export default function RouteVideoDialog({
         title: trip.title,
         subtitle: subtitle(),
         infos,
+        endCard,
         signal: ctrl.signal,
         onProgress: (fraction, label) => setPhase({ name: "working", fraction, label }),
       });
@@ -143,6 +146,21 @@ export default function RouteVideoDialog({
               <br />
               만드는 동안에는 이 화면을 켜 둔 채로 기다려 주세요.
             </p>
+            <label className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-2xl bg-gray-50 px-4 py-2">
+              <span className="text-sm font-medium text-gray-800">
+                끝에 앱 안내 넣기
+                <span className="block text-[11px] font-normal text-gray-400">앱 이름 · 주소 · QR 코드 (약 3초)</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={endCard}
+                onChange={(e) => {
+                  setEndCard(e.target.checked);
+                  setVideoEndCard(e.target.checked);
+                }}
+                className="h-5 w-5 shrink-0 accent-indigo-600"
+              />
+            </label>
             {!supported && (
               <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
                 이 브라우저는 영상 만들기를 지원하지 않아요. 최신 Chrome, Edge, Safari에서 열어 주세요.

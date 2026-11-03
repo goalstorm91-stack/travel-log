@@ -2,6 +2,8 @@ import { LngLatBounds, Map as MLMap } from "maplibre-gl";
 import { dayColor } from "./colors";
 import { loadBaseStyle } from "./mapStyle";
 import { playbackFrame, segmentMs, type Stop } from "./route";
+import { APP_NAME, APP_URL } from "../config";
+import { drawQr } from "./qr";
 
 /**
  * Route video export.
@@ -27,6 +29,8 @@ export interface RouteVideoOptions {
   infos: VideoStopInfo[];
   onProgress?: (fraction: number, label: string) => void;
   signal?: AbortSignal;
+  /** Append a closing card with the app name, address and a QR code. */
+  endCard?: boolean;
 }
 
 const W = 720;
@@ -42,6 +46,8 @@ const CARD_H = 344;
 const THUMB = 296;
 const INTRO_MS = 800;
 const OUTRO_MS = 1400;
+const END_FADE_MS = 450;
+const END_HOLD_MS = 3000; // long enough to scan the QR code or pause on it
 const FONT = '"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif';
 const CODECS = ["avc1.640028", "avc1.4d0028", "avc1.42e01f"]; // High, Main, Baseline (level 4.0/3.1)
 
@@ -194,6 +200,70 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, maxW: number, star
   return size;
 }
 
+export async function loadAppIcon(): Promise<ImageBitmap | null> {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}icon-192.png`);
+    return res.ok ? await createImageBitmap(await res.blob()) : null;
+  } catch {
+    return null; // the card still works without the icon
+  }
+}
+
+/** Closing card: app name, one-line pitch, QR code and address. `alpha` fades it over the route. */
+export function drawEndCard(ctx: CanvasRenderingContext2D, alpha: number, icon: ImageBitmap | null) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#4338ca");
+  bg.addColorStop(1, "#1e1b4b");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+
+  if (icon) {
+    ctx.save();
+    roundRect(ctx, W / 2 - 64, 150, 128, 128, 30);
+    ctx.clip();
+    ctx.drawImage(icon, W / 2 - 64, 150, 128, 128);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = `700 22px ${FONT}`;
+  ctx.fillText("TRAVEL JOURNAL", W / 2, 336);
+  ctx.fillStyle = "#fff";
+  const nameSize = fitFont(ctx, APP_NAME, W - 120, 76, 40);
+  ctx.font = `800 ${nameSize}px ${FONT}`;
+  ctx.fillText(APP_NAME, W / 2, 420);
+
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.font = `500 30px ${FONT}`;
+  ctx.fillText("사진만 고르면 여행 일지가 완성돼요", W / 2, 486);
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = `500 26px ${FONT}`;
+  ctx.fillText("기록은 내 폰에만 저장돼요", W / 2, 530);
+
+  const QR = 340;
+  drawQr(ctx, APP_URL, (W - QR) / 2, 590, QR, { radius: 28 });
+
+  ctx.fillStyle = "#fff";
+  const shown = APP_URL.replace(/^https?:\/\//, "");
+  const urlSize = fitFont(ctx, shown, W - 100, 34, 20, 700);
+  ctx.font = `700 ${urlSize}px ${FONT}`;
+  ctx.fillText(shown, W / 2, 984);
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.font = `500 25px ${FONT}`;
+  ctx.fillText("QR을 찍고, 홈 화면에 추가해서 써 보세요", W / 2, 1030);
+
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = `400 19px ${FONT}`;
+  ctx.fillText("Made by Seo Taeseong, 2026", W / 2, H - 30);
+  ctx.restore();
+}
+
 export async function exportRouteVideo(opts: RouteVideoOptions): Promise<Blob> {
   const { infos, signal, onProgress } = opts;
   if (!isRouteVideoSupported()) throw new VideoUnsupportedError("VideoEncoder unavailable");
@@ -222,7 +292,10 @@ export async function exportRouteVideo(opts: RouteVideoOptions): Promise<Blob> {
   const n = stops.length;
   const segMs = segmentMs(n, 12000);
   const playMs = (n - 1) * segMs;
-  const totalMs = INTRO_MS + playMs + OUTRO_MS;
+  const routeMs = INTRO_MS + playMs + OUTRO_MS;
+  const totalMs = routeMs + (opts.endCard ? END_FADE_MS + END_HOLD_MS : 0);
+  const endIcon = opts.endCard ? await loadAppIcon() : null;
+  checkAbort(signal);
   const frameCount = Math.ceil((totalMs / 1000) * FPS);
 
   const canvas = document.createElement("canvas");
@@ -441,7 +514,9 @@ export async function exportRouteVideo(opts: RouteVideoOptions): Promise<Blob> {
     for (let i = 0; i < frameCount; i++) {
       checkAbort(signal);
       if (encoderError) throw encoderError;
-      drawFrame((i / FPS) * 1000);
+      const ms = (i / FPS) * 1000;
+      drawFrame(Math.min(ms, routeMs));
+      if (opts.endCard && ms > routeMs) drawEndCard(ctx, Math.min(1, (ms - routeMs) / END_FADE_MS), endIcon);
       const frame = new VideoFrame(canvas, {
         timestamp: Math.round((i * 1e6) / FPS),
         duration: Math.round(1e6 / FPS),

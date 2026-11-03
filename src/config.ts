@@ -12,3 +12,6 @@ export const APP_URL = clean(import.meta.env.VITE_APP_URL) || location.origin;
 
 /** Kakao JavaScript key. Empty means Kakao card sharing is switched off. */
 export const KAKAO_JS_KEY = (import.meta.env.VITE_KAKAO_JS_KEY ?? "").trim();
+
+/** The name shown on the end card of exported videos. */
+export const APP_NAME = "여행 기록";
