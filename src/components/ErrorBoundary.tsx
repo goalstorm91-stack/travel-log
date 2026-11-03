@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { exportBackup } from "../utils/backup";
+import { runBackup } from "../utils/runBackup";
 
 interface State {
   error: Error | null;
@@ -24,12 +24,8 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, St
 
   private backup = async () => {
     this.setState({ backupNote: "백업 파일을 만드는 중…" });
-    try {
-      const s = await exportBackup();
-      this.setState({ backupNote: `백업했어요. (여행 ${s.trips}개, 사진 ${s.photos}장)` });
-    } catch {
-      this.setState({ backupNote: "백업하지 못했어요. 잠시 후 다시 시도해 주세요." });
-    }
+    const result = await runBackup();
+    this.setState({ backupNote: result.text });
   };
 
   render() {

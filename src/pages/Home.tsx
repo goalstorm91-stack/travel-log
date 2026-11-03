@@ -6,6 +6,7 @@ import { toISODate } from "../utils/exif";
 import type { Trip } from "../types";
 import PhotoImg from "../components/PhotoImg";
 import InstallCard from "../components/InstallCard";
+import BackupReminder from "../components/BackupReminder";
 
 export default function Home() {
   const trips = useLiveQuery(
@@ -70,7 +71,8 @@ export default function Home() {
 
       {trips && trips.length === 0 && <StartSteps />}
 
-      <div className="mt-5 empty:hidden">
+      <div className="mt-5 flex flex-col gap-3 empty:hidden">
+        <BackupReminder />
         <InstallCard />
       </div>
 
