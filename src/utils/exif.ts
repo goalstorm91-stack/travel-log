@@ -1,5 +1,8 @@
-import { parse, gps } from "exifr";
 import { isHeic } from "./imageStore";
+
+// exifr is large and only needed while photos are being imported, so it is loaded on first
+// use rather than bundled into the first screen (Home also imports toISODate from here).
+const loadExifr = () => import("exifr");
 
 export interface PhotoMeta {
   takenAt: number;
@@ -14,6 +17,7 @@ export interface PhotoMeta {
  */
 export async function readPhotoMeta(file: Blob, fallbackTime: number): Promise<PhotoMeta> {
   const meta: PhotoMeta = { takenAt: fallbackTime, dateSource: "file" };
+  const { parse, gps } = await loadExifr();
 
   try {
     const exif = await parse(file, ["DateTimeOriginal", "CreateDate"]);
@@ -45,7 +49,7 @@ export async function readPhotoMeta(file: Blob, fallbackTime: number): Promise<P
   // Some HEIC writers lay out their boxes in a way exifr's HEIC reader can't walk,
   // even though the EXIF block itself is standard. Find that block directly.
   if (isHeic(file as File) && (meta.dateSource === "file" || meta.lat === undefined)) {
-    await fillFromRawExif(file, meta);
+    await fillFromRawExif(file, meta, { parse, gps });
   }
 
   return meta;
@@ -64,7 +68,11 @@ function findExifTiff(bytes: Uint8Array): number {
   return -1;
 }
 
-async function fillFromRawExif(file: Blob, meta: PhotoMeta): Promise<void> {
+async function fillFromRawExif(
+  file: Blob,
+  meta: PhotoMeta,
+  { parse, gps }: Pick<Awaited<ReturnType<typeof loadExifr>>, "parse" | "gps">,
+): Promise<void> {
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const at = findExifTiff(bytes);
