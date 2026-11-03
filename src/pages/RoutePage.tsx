@@ -58,7 +58,9 @@ function RouteView({ tripId }: { tripId: string }) {
   const [scan, setScan] = useState<{ done: number; total: number } | null>(null);
   const scanningRef = useRef(false);
   const elapsedRef = useRef(0);
-  elapsedRef.current = elapsed;
+  useEffect(() => {
+    elapsedRef.current = elapsed;
+  });
 
   // Photos saved before GPS support have no metadata yet: read it from the
   // stored originals once, so existing trips get a route too.

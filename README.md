@@ -8,7 +8,13 @@ npm install
 npm run dev       # 개발 서버 (http://localhost:5173)
 npm run build     # 타입 검사 + 배포용 빌드
 npm run lint      # oxlint
+npm test          # 단위 테스트 (vitest)
 ```
+
+## 테스트
+
+`npm test`로 핵심 로직의 단위 테스트를 돌려요(정산 계산, 동선 만들기·재생, 도시 찾기, 백업·복원, 백업 알림 기준, 썸네일 정리 등).
+화면 자체가 아니라 계산·저장 로직을 확인하는 테스트예요. IndexedDB는 `fake-indexeddb`로 대신해서 브라우저 없이 빠르게 돌아가요.
 
 ## 배포 설정 (한 곳에서 관리)
 

@@ -83,7 +83,9 @@ const WorldMap = forwardRef<
 
   // Latest callbacks, so map listeners registered once never go stale.
   const cb = useRef({ onHoverCountry, onCountryClick, onPinClick });
-  cb.current = { onHoverCountry, onCountryClick, onPinClick };
+  useEffect(() => {
+    cb.current = { onHoverCountry, onCountryClick, onPinClick };
+  });
 
   const countries = useMemo(() => {
     const collection = feature(
@@ -130,7 +132,9 @@ const WorldMap = forwardRef<
     );
   }
   const zoomRef = useRef(zoomToCountry);
-  zoomRef.current = zoomToCountry;
+  useEffect(() => {
+    zoomRef.current = zoomToCountry;
+  });
 
   // Init the map once (the style is fetched first, so this is async).
   useEffect(() => {

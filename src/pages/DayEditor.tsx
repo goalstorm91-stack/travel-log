@@ -10,34 +10,74 @@ import PhotoImg from "../components/PhotoImg";
 import { useUnsavedGuard } from "../utils/useUnsavedGuard";
 
 export default function DayEditor() {
-  const { tripId, dayId: routeDayId } = useParams<{
-    tripId: string;
-    dayId?: string;
-  }>();
+  const { tripId, dayId: routeDayId } = useParams<{ tripId: string; dayId?: string }>();
+  const isNew = !routeDayId;
+  const [newDayId] = useState(() => uuid());
+
+  // null = looked up and not found; undefined = still loading
+  const trip = useLiveQuery(() => db.trips.get(tripId!).then((t) => t ?? null), [tripId]);
+  const tripDays = useLiveQuery(() => db.days.where("tripId").equals(tripId!).sortBy("dayNumber"), [tripId]);
+  const existingDay = useLiveQuery(
+    () => (routeDayId ? db.days.get(routeDayId).then((d) => d ?? null) : null),
+    [routeDayId],
+  );
+
+  // The form below starts from these values once, so wait until they are known.
+  if (trip === undefined || tripDays === undefined || existingDay === undefined) return null;
+  if (trip === null || (!isNew && existingDay === null)) {
+    return (
+      <div className="px-4 pt-10 text-center text-sm text-gray-500">
+        기록을 찾을 수 없어요.
+        <Link to={trip ? `/trips/${trip.id}` : "/"} className="mt-4 block font-semibold text-indigo-600">
+          돌아가기
+        </Link>
+      </div>
+    );
+  }
+
+  // A new day continues the numbering and dates of the trip so far.
+  const next = tripDays.length;
+  const base = new Date(trip.startDate);
+  base.setDate(base.getDate() + next);
+
+  return (
+    <DayForm
+      key={existingDay?.id ?? newDayId}
+      tripId={trip.id}
+      dayId={existingDay?.id ?? newDayId}
+      existingDay={existingDay ?? undefined}
+      defaultDate={base.toISOString().slice(0, 10)}
+      defaultDayNumber={next + 1}
+    />
+  );
+}
+
+function DayForm({
+  tripId,
+  dayId,
+  existingDay,
+  defaultDate,
+  defaultDayNumber,
+}: {
+  tripId: string;
+  dayId: string;
+  existingDay?: DayEntry;
+  defaultDate: string;
+  defaultDayNumber: number;
+}) {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isNew = !existingDay;
+  // What the form started from: "unsaved changes" means differing from this.
+  const [baseline] = useState(existingDay);
 
-  const isNew = !routeDayId;
-  const [dayId] = useState(() => routeDayId ?? uuid());
-
-  const trip = useLiveQuery(() => db.trips.get(tripId!), [tripId]);
-  const existingDay = useLiveQuery(
-    () => (isNew ? undefined : db.days.get(dayId)),
-    [dayId, isNew],
-  );
-  const tripDays = useLiveQuery(
-    () => db.days.where("tripId").equals(tripId!).sortBy("dayNumber"),
-    [tripId],
-  );
-
-  const [date, setDate] = useState("");
-  const [dayNumber, setDayNumber] = useState(1);
-  const [title, setTitle] = useState("");
-  const [locationName, setLocationName] = useState("");
-  const [text, setText] = useState("");
-  const [quote, setQuote] = useState("");
-  const [photoIds, setPhotoIds] = useState<string[]>([]);
-  const [loaded, setLoaded] = useState(isNew);
+  const [date, setDate] = useState(existingDay?.date ?? defaultDate);
+  const [dayNumber, setDayNumber] = useState(existingDay?.dayNumber ?? defaultDayNumber);
+  const [title, setTitle] = useState(existingDay?.title ?? "");
+  const [locationName, setLocationName] = useState(existingDay?.locationName ?? "");
+  const [text, setText] = useState(existingDay?.text ?? "");
+  const [quote, setQuote] = useState(existingDay?.quote ?? "");
+  const [photoIds, setPhotoIds] = useState<string[]>(existingDay?.photoIds ?? []);
   const [error, setError] = useState("");
 
   // Photo changes are staged until "저장하기": new photos are stored right away (they have to
@@ -63,41 +103,16 @@ export default function DayEditor() {
   const dirty =
     added.length > 0 ||
     removed.length > 0 ||
-    (isNew
-      ? !!(title.trim() || locationName.trim() || text.trim() || quote.trim())
-      : !!existingDay &&
-        loaded &&
-        (date !== existingDay.date ||
-          dayNumber !== existingDay.dayNumber ||
-          title !== existingDay.title ||
-          locationName !== (existingDay.locationName ?? "") ||
-          text !== (existingDay.text ?? "") ||
-          quote !== (existingDay.quote ?? "") ||
-          photoIds.join() !== existingDay.photoIds.join()));
+    (baseline
+      ? date !== baseline.date ||
+        dayNumber !== baseline.dayNumber ||
+        title !== baseline.title ||
+        locationName !== (baseline.locationName ?? "") ||
+        text !== (baseline.text ?? "") ||
+        quote !== (baseline.quote ?? "") ||
+        photoIds.join() !== baseline.photoIds.join()
+      : !!(title.trim() || locationName.trim() || text.trim() || quote.trim()));
   const guard = useUnsavedGuard(dirty);
-
-  useEffect(() => {
-    if (!isNew && existingDay && !loaded) {
-      setDate(existingDay.date);
-      setDayNumber(existingDay.dayNumber);
-      setTitle(existingDay.title);
-      setLocationName(existingDay.locationName ?? "");
-      setText(existingDay.text ?? "");
-      setQuote(existingDay.quote ?? "");
-      setPhotoIds(existingDay.photoIds);
-      setLoaded(true);
-    }
-  }, [isNew, existingDay, loaded]);
-
-  useEffect(() => {
-    if (isNew && trip && tripDays && !date) {
-      const next = tripDays.length;
-      setDayNumber(next + 1);
-      const base = new Date(trip.startDate);
-      base.setDate(base.getDate() + next);
-      setDate(base.toISOString().slice(0, 10));
-    }
-  }, [isNew, trip, tripDays, date]);
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -115,7 +130,7 @@ export default function DayEditor() {
       }
       await db.photos.add({
         id,
-        tripId: tripId!,
+        tripId,
         dayId,
         blob,
         createdAt: Date.now(),
@@ -162,7 +177,7 @@ export default function DayEditor() {
     const now = Date.now();
     const entry: DayEntry = {
       id: dayId,
-      tripId: tripId!,
+      tripId,
       dayNumber,
       date,
       title: title.trim(),
@@ -170,7 +185,7 @@ export default function DayEditor() {
       text: text.trim() || undefined,
       quote: quote.trim() || undefined,
       photoIds,
-      createdAt: existingDay?.createdAt ?? now,
+      createdAt: baseline?.createdAt ?? now,
       updatedAt: now,
     };
     await db.days.put(entry);
